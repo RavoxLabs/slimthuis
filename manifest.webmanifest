@@ -1,0 +1,16 @@
+{
+  "name": "SlimThuis — voorraad, noodpakket & noodgids",
+  "short_name": "SlimThuis",
+  "description": "Voorraadbeheer, noodpakket-checklist, EHBO-gids en scenario's voor noodsituaties. Werkt offline.",
+  "lang": "nl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F5F2EC",
+  "theme_color": "#F5F2EC",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,2264 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SlimThuis — rust in huis, ook als het misgaat</title>
+<meta name="description" content="Voorraadbeheer, noodpakket-checklist, EHBO-gids en scenario's voor noodsituaties. Werkt offline, gegevens blijven op je eigen apparaat.">
+<meta name="theme-color" content="#F5F2EC">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="SlimThuis">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F5F2EC;
+    --bg2: #EDEAE2;
+    --surface: #FFFFFF;
+    --border: rgba(0,0,0,0.10);
+    --border2: rgba(0,0,0,0.16);
+    --text: #1A1A16;
+    --text2: #6B6860;
+    --text3: #9A9890;
+    --green: #3B6D11;
+    --green-bg: #EAF3DE;
+    --amber: #854F0B;
+    --amber-bg: #FAEEDA;
+    --red: #A32D2D;
+    --red-bg: #FCEBEB;
+    --blue: #185FA5;
+    --blue-bg: #E6F1FB;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 15px;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--surface);
+    border-bottom: 0.5px solid var(--border);
+    padding: 0 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 20px;
+    color: var(--text);
+    letter-spacing: -0.02em;
+  }
+  .logo span { color: var(--green); }
+  .header-date {
+    font-size: 12px;
+    color: var(--text3);
+  }
+
+  /* NAV */
+  .nav {
+    background: var(--surface);
+    border-bottom: 0.5px solid var(--border);
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav-item {
+    flex: 1;
+    min-width: 70px;
+    padding: 10px 8px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text3);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s;
+    user-select: none;
+  }
+  .nav-item svg { display: block; margin: 0 auto 3px; width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .nav-item.active { color: var(--text); border-bottom: 2px solid var(--text); }
+
+  /* MAIN */
+  .main { max-width: 600px; margin: 0 auto; padding: 1rem 1rem 5rem; }
+
+  /* SECTIONS */
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* CARDS */
+  .card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 12px 16px;
+    border-bottom: 0.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .card-title { font-size: 13px; font-weight: 500; color: var(--text2); }
+
+  /* ALERT BANNERS */
+  .alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+    animation: fadeIn 0.3s ease;
+  }
+  .alert svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .alert-body { flex: 1; }
+  .alert-title { font-size: 13px; font-weight: 500; }
+  .alert-sub { font-size: 12px; margin-top: 2px; opacity: 0.8; }
+  .alert.red { background: var(--red-bg); color: var(--red); }
+  .alert.amber { background: var(--amber-bg); color: var(--amber); }
+  .alert.blue { background: var(--blue-bg); color: var(--blue); }
+  .alert.green { background: var(--green-bg); color: var(--green); }
+
+  /* PRODUCT LIST */
+  .product-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 16px;
+    border-bottom: 0.5px solid var(--border);
+    transition: background 0.15s;
+  }
+  .product-row:last-child { border-bottom: none; }
+  .product-row:hover { background: var(--bg); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot.green { background: var(--green); }
+  .dot.amber { background: #EF9F27; }
+  .dot.red { background: #E24B4A; }
+  .product-info { flex: 1; min-width: 0; }
+  .product-name { font-size: 14px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .product-meta { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .product-date { font-size: 12px; color: var(--text2); flex-shrink: 0; }
+  .product-delete {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text3);
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    transition: color 0.15s;
+  }
+  .product-delete:hover { color: var(--red); }
+  .product-delete svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* STAT ROW */
+  .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+  .stat-box {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    text-align: center;
+  }
+  .stat-num { font-size: 22px; font-weight: 500; color: var(--text); }
+  .stat-label { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+  /* ADD FORM */
+  .add-form {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 10px;
+  }
+  .add-form h3 { font-size: 14px; font-weight: 500; margin-bottom: 12px; color: var(--text2); }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .form-full { grid-column: 1 / -1; }
+  label { font-size: 12px; color: var(--text2); display: block; margin-bottom: 4px; }
+  input, select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input:focus, select:focus { border-color: var(--text); }
+  .btn {
+    padding: 9px 18px;
+    border-radius: var(--radius-sm);
+    border: 0.5px solid var(--border2);
+    background: var(--text);
+    color: var(--bg);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn.secondary { background: var(--bg); color: var(--text); }
+
+  /* EHBO */
+  .ehbo-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 16px;
+    border-bottom: 0.5px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .ehbo-item:last-child { border-bottom: none; }
+  .ehbo-item:hover { background: var(--bg); }
+  .urgency-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .ehbo-name { flex: 1; font-size: 14px; }
+  .ehbo-arrow svg { width: 16px; height: 16px; stroke: var(--text3); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* EHBO DETAIL */
+  .ehbo-detail { display: none; }
+  .ehbo-detail.open { display: block; }
+  .back-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    color: var(--text2);
+    padding: 0;
+    margin-bottom: 12px;
+  }
+  .back-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .ehbo-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .ehbo-step:last-child { border-bottom: none; }
+  .step-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--text);
+    color: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  .step-text { flex: 1; font-size: 14px; line-height: 1.6; color: var(--text); padding-top: 2px; }
+
+  /* EHBO ILLUSTRATIES */
+  .ehbo-illu {
+    background: var(--bg);
+    border-bottom: 0.5px solid var(--border);
+    padding: 14px 20px;
+  }
+  .ehbo-illu svg { display: block; width: 100%; height: auto; max-height: 175px; margin: 0 auto; }
+  .step-illu { margin: 10px 0 4px; background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; }
+  .step-illu svg { display: block; width: 100%; height: auto; max-height: 130px; }
+  .ehbo-note {
+    font-size: 12px;
+    color: var(--text3);
+    line-height: 1.5;
+    text-align: center;
+    padding: 14px 16px 4px;
+  }
+
+  /* SYNC */
+  .sync-rij { display: flex; gap: 8px; padding: 0 16px 12px; }
+  .sync-rij input { flex: 1; }
+  .sync-knop {
+    background: var(--green); border: none; color: #fff; font-family: inherit;
+    font-size: 13px; padding: 10px 16px; border-radius: var(--radius-sm); cursor: pointer; white-space: nowrap;
+  }
+  .sync-knop.stil { background: transparent; border: 1px solid var(--border2); color: var(--text2); }
+  .sync-tekst { font-size: 13px; color: var(--text2); line-height: 1.55; padding: 14px 16px 10px; }
+  .sync-code {
+    font-size: 22px; font-weight: 500; letter-spacing: 0.25em; text-align: center;
+    background: var(--bg); border: 1px dashed var(--border2); border-radius: var(--radius-sm);
+    padding: 12px; margin: 0 16px 12px; color: var(--text);
+  }
+  .sync-status { font-size: 12px; color: var(--text3); padding: 0 16px 14px; }
+
+  /* SCORE */
+  .score-totaal { display: flex; align-items: baseline; gap: 10px; padding: 16px 16px 6px; }
+  .score-num { font-size: 34px; font-weight: 500; color: var(--text); letter-spacing: -0.02em; }
+  .score-sub { font-size: 12px; color: var(--text3); }
+  .score-row { display: flex; align-items: center; gap: 12px; padding: 8px 16px; }
+  .score-row:last-child { padding-bottom: 16px; }
+  .score-label { font-size: 13px; color: var(--text2); width: 88px; flex-shrink: 0; }
+  .score-bar { flex: 1; height: 7px; background: var(--bg2); border-radius: 4px; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
+  .score-pct { font-size: 12px; color: var(--text3); width: 38px; text-align: right; }
+
+  /* GEBRUIK EERST */
+  .rotatie-row { display: flex; align-items: center; gap: 12px; padding: 11px 16px; border-bottom: 0.5px solid var(--border); }
+  .rotatie-row:last-child { border-bottom: none; }
+  .rotatie-naam { flex: 1; font-size: 14px; color: var(--text); }
+  .rotatie-dagen { font-size: 12px; color: var(--amber, #EF9F27); white-space: nowrap; }
+
+  /* MELDING MET ACTIE */
+  .alert-doen {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--text2);
+    font-family: inherit;
+    font-size: 11px;
+    padding: 6px 10px;
+    border-radius: 20px;
+    cursor: pointer;
+    white-space: nowrap;
+    align-self: center;
+    flex-shrink: 0;
+  }
+  .alert-doen:hover { border-color: var(--green); color: var(--green); }
+
+  /* BARCODESCANNER */
+  .scan-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 1px dashed var(--border2);
+    background: var(--bg);
+    color: var(--text2);
+    font-family: inherit;
+    font-size: 13px;
+    padding: 11px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    margin-bottom: 10px;
+    transition: all 0.15s;
+  }
+  .scan-btn:hover { border-color: var(--green); color: var(--green); }
+  .scan-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .scan-modal {
+    position: fixed; inset: 0; background: rgba(20, 19, 16, 0.92);
+    display: none; align-items: center; justify-content: center; z-index: 200; padding: 20px;
+  }
+  .scan-modal.open { display: flex; }
+  .scan-inner { width: 100%; max-width: 420px; }
+  .scan-inner video {
+    width: 100%; aspect-ratio: 4/3; object-fit: cover;
+    border-radius: var(--radius); background: #000; display: block;
+  }
+  .scan-status { color: #E8E5DD; font-size: 13px; text-align: center; margin: 14px 0; line-height: 1.5; }
+  .scan-handmatig { display: flex; gap: 8px; margin-bottom: 14px; }
+  .scan-handmatig input {
+    flex: 1; background: #2A2925; border: 1px solid #44423C; color: #E8E5DD;
+    font-family: inherit; font-size: 14px; padding: 10px 12px; border-radius: var(--radius-sm);
+  }
+  .scan-handmatig button, .scan-sluit {
+    background: var(--green); border: none; color: #fff; font-family: inherit; font-size: 13px;
+    padding: 10px 16px; border-radius: var(--radius-sm); cursor: pointer;
+  }
+  .scan-sluit { display: block; width: 100%; background: transparent; border: 1px solid #44423C; color: #B5B2AA; }
+
+  /* NOODPLAN */
+  .tel-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .tel-row:last-child { border-bottom: none; }
+  .tel-body { flex: 1; min-width: 0; }
+  .tel-naam { font-size: 14px; color: var(--text); }
+  .tel-sub { font-size: 12px; color: var(--text3); margin-top: 1px; }
+  .tel-nummer {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+  .tel-bel {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--green-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    text-decoration: none;
+  }
+  .tel-bel svg { width: 16px; height: 16px; stroke: var(--green); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .tel-bel.rood { background: var(--red-bg); }
+  .tel-bel.rood svg { stroke: var(--red); }
+  .eigen-row { padding: 12px 16px; border-bottom: 0.5px solid var(--border); }
+  .eigen-row:last-child { border-bottom: none; }
+  .eigen-top { display: flex; align-items: center; gap: 8px; }
+  .eigen-top input { flex: 1; }
+  .eigen-top .tel-bel { width: 38px; height: 38px; }
+  .plan-row { padding: 12px 16px; border-bottom: 0.5px solid var(--border); }
+  .plan-row:last-child { border-bottom: none; }
+  .plan-row textarea {
+    width: 100%;
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    resize: none;
+    line-height: 1.5;
+    min-height: 42px;
+  }
+  .plan-row textarea:focus { outline: none; border-color: var(--border2); }
+
+  /* NOODPAKKET */
+  .progress-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 10px;
+  }
+  .progress-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .progress-title { font-size: 13px; font-weight: 500; color: var(--text2); }
+  .progress-count { font-size: 13px; color: var(--text2); }
+  .progress-bar { height: 8px; background: var(--bg2); border-radius: 4px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--green); border-radius: 4px; width: 0; transition: width 0.3s ease; }
+  .huishouden-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .berekend-row { display: flex; gap: 8px; margin-top: 10px; }
+  .berekend-box {
+    flex: 1;
+    background: var(--green-bg);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+  }
+  .berekend-num { font-size: 16px; font-weight: 500; color: var(--green); }
+  .berekend-label { font-size: 11px; color: var(--green); opacity: 0.85; margin-top: 1px; }
+  .check-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 0.5px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s;
+    user-select: none;
+  }
+  .check-row:last-child { border-bottom: none; }
+  .check-row:hover { background: var(--bg); }
+  .checkbox {
+    width: 20px;
+    height: 20px;
+    border: 1.5px solid var(--border2);
+    border-radius: 6px;
+    flex-shrink: 0;
+    margin-top: 1px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+  .checkbox svg { width: 13px; height: 13px; stroke: #fff; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+  .check-row.checked .checkbox { background: var(--green); border-color: var(--green); }
+  .check-row.checked .checkbox svg { opacity: 1; }
+  .check-body { flex: 1; }
+  .check-name { font-size: 14px; color: var(--text); line-height: 1.4; }
+  .check-row.checked .check-name { color: var(--text3); text-decoration: line-through; text-decoration-color: var(--border2); }
+  .check-sub { font-size: 12px; color: var(--text3); margin-top: 2px; line-height: 1.4; }
+  .check-link { font-size: 12px; color: var(--green); margin-top: 2px; line-height: 1.4; }
+  .np-add {
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--text2);
+    font-family: inherit;
+    font-size: 11px;
+    padding: 5px 9px;
+    border-radius: 20px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-top: 1px;
+    transition: all 0.15s;
+  }
+  .np-add:hover { border-color: var(--green); color: var(--green); }
+
+  /* TIPS */
+  .tip-row {
+    padding: 13px 16px;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .tip-row:last-child { border-bottom: none; }
+  .tip-label { font-size: 11px; font-weight: 500; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .tip-text { font-size: 14px; color: var(--text); line-height: 1.5; }
+
+  /* REMINDERS */
+  .reminder-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .reminder-row:last-child { border-bottom: none; }
+  .reminder-icon svg { width: 18px; height: 18px; stroke: var(--text2); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; margin-top: 1px; }
+  .reminder-body { flex: 1; }
+  .reminder-title { font-size: 14px; font-weight: 500; }
+  .reminder-sub { font-size: 12px; color: var(--text2); margin-top: 2px; line-height: 1.4; }
+  .reminder-when { font-size: 11px; color: var(--text3); margin-top: 4px; }
+
+  /* EMPTY STATE */
+  .empty { text-align: center; padding: 2rem 1rem; color: var(--text3); font-size: 14px; }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--text);
+    color: var(--bg);
+    padding: 10px 18px;
+    border-radius: 20px;
+    font-size: 13px;
+    opacity: 0;
+    transition: all 0.3s ease;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 200;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* RECLAME BANNER */
+  .ad-banner {
+    background: var(--bg2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+  .section-label { font-size: 12px; font-weight: 500; color: var(--text3); margin: 16px 0 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">Slim<span>Thuis</span></div>
+  <div class="header-date" id="headerDate"></div>
+</div>
+
+<div class="nav">
+  <div class="nav-item active" onclick="showTab('vandaag')">
+    <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    Vandaag
+  </div>
+  <div class="nav-item" onclick="showTab('voorraad')">
+    <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+    Voorraad
+  </div>
+  <div class="nav-item" onclick="showTab('noodpakket')">
+    <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+    Noodpakket
+  </div>
+  <div class="nav-item" onclick="showTab('noodplan')">
+    <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.6 2.81.72A2 2 0 0 1 22 16.92z"/></svg>
+    Noodplan
+  </div>
+  <div class="nav-item" onclick="showTab('ehbo')">
+    <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+    Noodgids
+  </div>
+  <div class="nav-item" onclick="showTab('tips')">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    Tips
+  </div>
+  <div class="nav-item" onclick="showTab('herinneringen')">
+    <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    Agenda
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- VANDAAG -->
+  <div class="section active" id="tab-vandaag">
+    <div id="todayAlerts"></div>
+    <div class="ad-banner">Advertentie — upgrade naar Pro voor geen reclame</div>
+    <div class="section-label">Jouw voorraad overzicht</div>
+    <div class="stat-row">
+      <div class="stat-box">
+        <div class="stat-num" id="statTotal">0</div>
+        <div class="stat-label">Producten</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="statDays" style="color:var(--green)">—</div>
+        <div class="stat-label">Dagen dekking</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="statExpiring" style="color:#E24B4A">0</div>
+        <div class="stat-label">Bijna verlopen</div>
+      </div>
+    </div>
+
+    <div class="section-label">SlimThuis-score</div>
+    <div class="card" id="scoreCard"></div>
+
+    <div class="section-label">Delen & synchroniseren</div>
+    <div class="card" id="syncCard"></div>
+  </div>
+
+  <!-- VOORRAAD -->
+  <div class="section" id="tab-voorraad">
+
+    <div class="add-form">
+      <h3>Product toevoegen</h3>
+      <button class="scan-btn" onclick="startScan()">
+        <svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="7" y1="12" x2="7" y2="12.01"/><line x1="10" y1="12" x2="10" y2="12.01"/><line x1="13" y1="12" x2="13" y2="12.01"/><line x1="17" y1="12" x2="17" y2="12.01"/></svg>
+        Scan de barcode van het product
+      </button>
+      <div class="form-grid">
+        <div class="form-full">
+          <label>Productnaam</label>
+          <input type="text" id="inputNaam" placeholder="Bijv. Rijst 1kg">
+        </div>
+        <div>
+          <label>Categorie</label>
+          <select id="inputCategorie">
+            <option value="voedsel">Voedsel</option>
+            <option value="drinken">Drinken</option>
+            <option value="ehbo">EHBO</option>
+            <option value="medicijnen">Medicijnen</option>
+            <option value="hygiëne">Hygiëne</option>
+            <option value="overig">Overig</option>
+          </select>
+        </div>
+        <div>
+          <label>Aantal</label>
+          <input type="number" id="inputAantal" placeholder="1" min="1" value="1">
+        </div>
+        <div class="form-full">
+          <label>Houdbaar tot</label>
+          <input type="date" id="inputDatum">
+        </div>
+      </div>
+      <button class="btn" onclick="addProduct()">Toevoegen</button>
+    </div>
+
+    <div id="rotatieList"></div>
+    <div id="productList"></div>
+  </div>
+
+  <!-- NOODPAKKET -->
+  <div class="section" id="tab-noodpakket">
+    <div class="alert blue">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      <div class="alert-body"><div class="alert-title">Advies Rijksoverheid (Denk vooruit)</div><div class="alert-sub">Zorg dat je het thuis 72 uur kunt volhouden zonder stroom, water of hulp</div></div>
+    </div>
+
+    <div class="progress-card">
+      <div class="progress-top">
+        <div class="progress-title">Jouw noodpakket</div>
+        <div class="progress-count" id="npCount">0 van 0</div>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="npFill"></div></div>
+      <div class="huishouden-grid">
+        <div>
+          <label>Volwassenen</label>
+          <input type="number" id="npVolw" min="1" max="20" value="2" onchange="updateHuishouden()">
+        </div>
+        <div>
+          <label>Kinderen</label>
+          <input type="number" id="npKind" min="0" max="20" value="0" onchange="updateHuishouden()">
+        </div>
+        <div>
+          <label>Huisdieren</label>
+          <input type="number" id="npDier" min="0" max="20" value="0" onchange="updateHuishouden()">
+        </div>
+      </div>
+      <div class="berekend-row">
+        <div class="berekend-box">
+          <div class="berekend-num" id="npWater">18 liter</div>
+          <div class="berekend-label">water — 3 l p.p. per dag, 3 dagen</div>
+        </div>
+        <div class="berekend-box">
+          <div class="berekend-num" id="npGeld">€ 140</div>
+          <div class="berekend-label">contant — € 70 p. volwassene, € 30 p. kind</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="noodpakketList"></div>
+    <div class="ehbo-note">Bron: Denkvooruit.nl (Rijksoverheid).<br>Controleer je noodpakket elk half jaar op volledigheid en houdbaarheid.</div>
+  </div>
+
+  <!-- NOODPLAN -->
+  <div class="section" id="tab-noodplan">
+    <div class="section-label">Alarmnummers</div>
+    <div class="card" id="alarmNummers"></div>
+
+    <div class="section-label">Jouw nummers</div>
+    <div class="card" id="eigenNummers"></div>
+
+    <div class="section-label">Gezins-noodplan</div>
+    <div class="card" id="noodplanVelden"></div>
+
+    <div class="section-label">Goed om te weten</div>
+    <div class="card">
+      <div class="reminder-row">
+        <div class="reminder-icon"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
+        <div class="reminder-body">
+          <div class="reminder-title">NL-Alert</div>
+          <div class="reminder-sub">Komt bij een noodsituatie in de buurt automatisch op je telefoon, met wat er aan de hand is en wat je moet doen. Controleer in je telefooninstellingen of noodmeldingen aanstaan.</div>
+        </div>
+      </div>
+      <div class="reminder-row">
+        <div class="reminder-icon"><svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg></div>
+        <div class="reminder-body">
+          <div class="reminder-title">Rampenzender</div>
+          <div class="reminder-sub">Vallen stroom en internet uit? Luister via een radio op batterijen naar je regionale omroep (voor Noord-Brabant: Omroep Brabant) voor officiële informatie.</div>
+        </div>
+      </div>
+      <div class="reminder-row">
+        <div class="reminder-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></div>
+        <div class="reminder-body">
+          <div class="reminder-title">Meer informatie</div>
+          <div class="reminder-sub">Op denkvooruit.nl en crisis.nl vind je het officiële advies van de Rijksoverheid over voorbereiding op noodsituaties.</div>
+        </div>
+      </div>
+    </div>
+    <div class="ehbo-note">Jouw nummers en noodplan worden alleen op dit apparaat opgeslagen.</div>
+  </div>
+
+  <!-- EHBO -->
+  <div class="section" id="tab-ehbo">
+    <div class="alert red">
+      <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.6 2.81.72A2 2 0 0 1 22 16.92z"/></svg>
+      <div class="alert-body"><div class="alert-title">Levensbedreigende situatie? Bel direct 112</div><div class="alert-sub">Zet de telefoon op luidspreker, dan houd je je handen vrij</div></div>
+    </div>
+    <div id="ehboList"></div>
+    <div id="ehboDetail" class="ehbo-detail"></div>
+  </div>
+
+  <!-- TIPS -->
+  <div class="section" id="tab-tips">
+    <div class="section-label">Slim inslaan</div>
+    <div class="card">
+      <div class="tip-row"><div class="tip-label">Goed idee</div><div class="tip-text">Rijst, pasta en havermout — houden jaren en zijn goedkoop</div></div>
+      <div class="tip-row"><div class="tip-label">Goed idee</div><div class="tip-text">Blikgroente, blikvis en peulvruchten — voedzaam en lang houdbaar</div></div>
+      <div class="tip-row"><div class="tip-label">Goed idee</div><div class="tip-text">Honing verloopt bijna nooit en geeft energie</div></div>
+      <div class="tip-row"><div class="tip-label">Goed idee</div><div class="tip-text">Minimaal 2 liter water per persoon per dag inplannen</div></div>
+      <div class="tip-row"><div class="tip-label">Goed idee</div><div class="tip-text">Contant geld thuis bewaren — pinnen werkt niet bij stroomstoring</div></div>
+      <div class="tip-row"><div class="tip-label">Goed idee</div><div class="tip-text">Extra medicatie en batterijen altijd op voorraad</div></div>
+      <div class="tip-row"><div class="tip-label">Sla dit niet in</div><div class="tip-text">Chips, koek en snoep — verlopen snel en bieden weinig voedingswaarde</div></div>
+      <div class="tip-row"><div class="tip-label">Sla dit niet in</div><div class="tip-text">Producten die je normaal nooit eet — je eet ze ook niet in een noodsituatie</div></div>
+    </div>
+
+    <div class="section-label">Wat je nooit moet doen</div>
+    <div class="card">
+      <div class="tip-row"><div class="tip-label" style="color:var(--red)">Nooit doen</div><div class="tip-text">Nooit een generator, barbecue of kachel binnen aanzetten — koolmonoxide is dodelijk en reukloos</div></div>
+      <div class="tip-row"><div class="tip-label" style="color:var(--red)">Nooit doen</div><div class="tip-text">Nooit kaarsen onbewaakt laten, zeker niet in de slaapkamer</div></div>
+      <div class="tip-row"><div class="tip-label" style="color:var(--red)">Nooit doen</div><div class="tip-text">Nooit kraanwater drinken na een overstroming zonder het te koken</div></div>
+      <div class="tip-row"><div class="tip-label" style="color:var(--red)">Nooit doen</div><div class="tip-text">Nooit de koelkast telkens openen bij stroomstoring — voedsel blijft dan 4 uur goed</div></div>
+      <div class="tip-row"><div class="tip-label" style="color:var(--red)">Nooit doen</div><div class="tip-text">Nooit een beschadigde gasfles of gasleiding zelf repareren</div></div>
+      <div class="tip-row"><div class="tip-label" style="color:var(--red)">Nooit doen</div><div class="tip-text">Nooit in een ondergelopen kelder lopen als de stroom nog aan is</div></div>
+    </div>
+  </div>
+
+  <!-- HERINNERINGEN -->
+  <div class="section" id="tab-herinneringen">
+    <div class="section-label">Maandelijks</div>
+    <div class="card">
+      <div class="reminder-row">
+        <div class="reminder-icon"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
+        <div class="reminder-body">
+          <div class="reminder-title">Rookmelder testen</div>
+          <div class="reminder-sub">Druk op de testknop. Werkt hij niet? Batterij vervangen of melder vervangen na 10 jaar.</div>
+          <div class="reminder-when">Elke 1e van de maand</div>
+        </div>
+      </div>
+      <div class="reminder-row">
+        <div class="reminder-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg></div>
+        <div class="reminder-body">
+          <div class="reminder-title">Medicijnen checken</div>
+          <div class="reminder-sub">Controleer vervaldatums in het medicijnkastje. Gooi verlopen medicijnen in bij de apotheek.</div>
+          <div class="reminder-when">Elke 1e van de maand</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-label">Elk half jaar</div>
+    <div class="card">
+      <div class="reminder-row">
+        <div class="reminder-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg></div>
+        <div class="reminder-body">
+          <div class="reminder-title">Noodpakket controleren</div>
+          <div class="reminder-sub">Is de voorraad nog compleet? Zijn de producten nog houdbaar? Powerbank nog opgeladen? Klopt het contante geld nog?</div>
+          <div class="reminder-when">Elk half jaar — advies Rijksoverheid</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-label">Seizoensgebonden</div>
+    <div class="card">
+      <div class="reminder-row">
+        <div class="reminder-icon"><svg viewBox="0 0 24 24"><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><circle cx="12" cy="12" r="10"/></svg></div>
+        <div class="reminder-body">
+          <div class="reminder-title">Wintercheck — oktober</div>
+          <div class="reminder-sub">Winterbanden, verwarmingsketel, antivries, ijskrabber in auto, extra dekens.</div>
+          <div class="reminder-when">Elk jaar in oktober</div>
+        </div>
+      </div>
+      <div class="reminder-row">
+        <div class="reminder-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></div>
+        <div class="reminder-body">
+          <div class="reminder-title">Zomercheck — april</div>
+          <div class="reminder-sub">Zonnebrand vervaldatum, ventilator werkend, tuinslang in orde, EHBO kit buiten.</div>
+          <div class="reminder-when">Elk jaar in april</div>
+        </div>
+      </div>
+      <div class="reminder-row">
+        <div class="reminder-icon"><svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+        <div class="reminder-body">
+          <div class="reminder-title">Brandveiligheid — januari</div>
+          <div class="reminder-sub">Brandblusser houdbaarheidsdatum, vluchtwegen vrij, rookmelder ouder dan 10 jaar vervangen.</div>
+          <div class="reminder-when">Elk jaar in januari</div>
+        </div>
+      </div>
+      <div class="reminder-row">
+        <div class="reminder-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <div class="reminder-body">
+          <div class="reminder-title">Voorraad grote check — elk kwartaal</div>
+          <div class="reminder-sub">Loop je hele voorraad door. Wat verloopt binnenkort? Wat mis je nog? Wat gebruik je nooit?</div>
+          <div class="reminder-when">Elk kwartaal</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-label">Weer gebaseerd</div>
+    <div class="card">
+      <div class="reminder-row">
+        <div class="reminder-icon"><svg viewBox="0 0 24 24"><path d="M19 16.9A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/><line x1="8" y1="19" x2="8" y2="21"/><line x1="8" y1="13" x2="8" y2="15"/><line x1="16" y1="19" x2="16" y2="21"/><line x1="16" y1="13" x2="16" y2="15"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="12" y1="15" x2="12" y2="17"/></svg></div>
+        <div class="reminder-body">
+          <div class="reminder-title">Storm verwacht</div>
+          <div class="reminder-sub">Losse spullen buiten binnenhalen. Dakgoten vrij? Zaklamp bij de hand. Auto niet onder boom.</div>
+          <div class="reminder-when">Automatisch bij storm verwachting</div>
+        </div>
+      </div>
+      <div class="reminder-row">
+        <div class="reminder-icon"><svg viewBox="0 0 24 24"><path d="M12 2v6m0 12v2M4.93 4.93l4.24 4.24m5.66 5.66l4.24 4.24M2 12h6m12 0h2M4.93 19.07l4.24-4.24m5.66-5.66l4.24-4.24"/></svg></div>
+        <div class="reminder-body">
+          <div class="reminder-title">Hittegolf</div>
+          <div class="reminder-sub">Extra water drinken, zonwering dicht overdag, oudere buren checken, geen zware inspanning.</div>
+          <div class="reminder-when">Bij temperaturen boven 30°C</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="scan-modal" id="scanModal">
+  <div class="scan-inner">
+    <video id="scanVideo" playsinline muted></video>
+    <div class="scan-status" id="scanStatus">Richt de camera op de barcode</div>
+    <div class="scan-handmatig">
+      <input inputmode="numeric" id="scanHandmatig" placeholder="Of typ de barcode (EAN)">
+      <button onclick="zoekBarcode(document.getElementById('scanHandmatig').value.trim())">Zoek</button>
+    </div>
+    <button class="scan-sluit" onclick="stopScan()">Annuleren</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const SVG_STROOMUITVAL = `<svg viewBox="0 0 320 150" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1A1A16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M70 78 L120 78 L160 38 L240 38 L240 122 L70 122 Z" stroke="none"/>
+  <path d="M84 124 V72 L160 30 L236 72 V124 Z"/>
+  <path d="M70 78 L160 28 L250 78" stroke-width="3"/>
+  <path d="M168 58 l-16 26 h14 l-12 26" stroke="#EF9F27"/>
+  <line x1="60" y1="124" x2="260" y2="124" stroke="#9A9890" stroke-width="2"/>
+</svg>`;
+
+const SVG_WATERUITVAL = `<svg viewBox="0 0 320 150" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1A1A16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M120 36 h60 M150 36 v22 h-18 v14"/>
+  <path d="M132 92 c-9 14 -9 22 0 26 c9 -4 9 -12 0 -26" stroke="#185FA5" stroke-width="2.5"/>
+  <line x1="112" y1="124" x2="152" y2="84" stroke="#E24B4A" stroke-width="2.5"/>
+  <circle cx="226" cy="84" r="26" stroke="#9A9890" stroke-width="2"/>
+  <path d="M226 70 v16 l10 8" stroke="#9A9890" stroke-width="2"/>
+</svg>`;
+
+const SVG_STORM = `<svg viewBox="0 0 320 150" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1A1A16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M104 78 a26 26 0 1 1 8 -50 a30 30 0 0 1 56 8 a22 22 0 0 1 4 42 Z"/>
+  <path d="M142 88 l-14 26 h13 l-11 24" stroke="#EF9F27"/>
+  <path d="M40 110 q20 -8 40 0 q20 8 40 0 M48 130 q20 -8 40 0" stroke="#185FA5" stroke-width="2.5"/>
+  <path d="M226 122 l8 -44 M250 122 l8 -44 M214 122 h56" stroke-width="2.5"/>
+</svg>`;
+
+const SVG_EVACUATIE = `<svg viewBox="0 0 320 150" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1A1A16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="60" y="28" width="64" height="100" rx="4"/>
+  <circle cx="112" cy="80" r="3" fill="#1A1A16" stroke="none"/>
+  <circle cx="196" cy="50" r="11"/>
+  <path d="M196 61 L188 92 L170 112 M188 92 L206 110"/>
+  <path d="M192 70 L172 80 M194 72 L216 84"/>
+  <path d="M240 76 h44 M284 76 l-12 -10 M284 76 l-12 10" stroke="#639922"/>
+  <line x1="50" y1="128" x2="290" y2="128" stroke="#9A9890" stroke-width="2"/>
+</svg>`;
+
+const SVG_BRAND = `<svg viewBox="0 0 320 150" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1A1A16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M84 128 V72 L160 30 L236 72 V128 Z"/>
+  <path d="M70 80 L160 28 L250 80"/>
+  <path d="M160 64 c12 12 22 22 22 36 a22 22 0 0 1 -44 0 c0 -10 6 -16 10 -22 c1 6 4 9 8 10 c-2 -8 0 -17 4 -24 z" stroke="#E24B4A" stroke-width="2.5"/>
+  <line x1="60" y1="128" x2="260" y2="128" stroke="#9A9890" stroke-width="2"/>
+</svg>`;
+
+const SCENARIO_DATA = [
+  {
+    naam: 'Stroomuitval',
+    svg: SVG_STROOMUITVAL,
+    stappen: [
+      'Kijk in de meterkast of een aardlekschakelaar of stop is omgesprongen. Zit het daar niet? Check (mobiel) de storingskaart van je netbeheerder of vraag de buren.',
+      'Pak je zaklamp uit het noodpakket. Wees voorzichtig met kaarsen — laat ze nooit onbeheerd branden.',
+      'Houd koelkast en vriezer dicht. Een gesloten volle vriezer houdt eten zo’n 48 uur goed, een halfvolle ongeveer 24 uur.',
+      'Trek apparaten met een verwarmingselement (kookplaat, strijkijzer, kachel) uit het stopcontact en laat één lamp aan — zo merk je wanneer de stroom terug is.',
+      'Duurt het langer? Zet de radio op batterijen aan voor informatie van de rampenzender.',
+      'Wordt het koud? Trek warme kleding aan en ga met z’n allen in één kamer zitten. Gebruik nooit een barbecue of terrasverwarmer binnen — koolmonoxidegevaar.',
+      'Is iemand in huis afhankelijk van medische apparatuur? Neem direct contact op met de zorgverlener.',
+    ]
+  },
+  {
+    naam: 'Wateruitval',
+    svg: SVG_WATERUITVAL,
+    stappen: [
+      'Check (mobiel) de storingspagina van je drinkwaterbedrijf — voor Noord-Brabant is dat Brabant Water.',
+      'Gebruik je noodvoorraad drinkwater: reken op 3 liter per persoon per dag.',
+      'Wees zuinig: spoel het toilet niet door met drinkwater. Gebruik daarvoor bijvoorbeeld regenwater.',
+      'Gebruik vochtige doekjes en handgel uit je noodpakket voor de hygiëne.',
+      'Krijg je een kookadvies (via NL-Alert of het waterbedrijf)? Laat kraanwater dan 3 minuten doorkoken voordat je het drinkt of ermee kookt.',
+      'Komt het water terug en is het bruin of wit? Laat de kraan doorstromen tot het water weer helder is.',
+    ]
+  },
+  {
+    naam: 'Storm & noodweer',
+    svg: SVG_STORM,
+    stappen: [
+      'Volg het weeralarm van het KNMI en NL-Alert. Bij code oranje of rood: blijf binnen en ga niet de weg op.',
+      'Zet losse spullen buiten vast of haal ze naar binnen: parasol, trampoline, kliko, tuinmeubels.',
+      'Parkeer de auto niet onder bomen en blijf zelf ook uit de buurt van bomen en steigers.',
+      'Sluit ramen, deuren en rolluiken en blijf weg bij de ramen.',
+      'Houd je zaklamp en radio bij de hand — storm veroorzaakt vaak stroomuitval.',
+      'Na de storm: controleer het dak op losse pannen en meld schade bij je verzekeraar. Bel 112 alleen bij acuut gevaar.',
+    ]
+  },
+  {
+    naam: 'Evacuatie',
+    svg: SVG_EVACUATIE,
+    stappen: [
+      'Pak je noodpakket of noodtas en je medicijnen — zie het tabblad Noodpakket.',
+      'Sluit gas, water en elektra af bij de hoofdkranen (de plek staat in je noodplan).',
+      'Doe ramen en deuren dicht en op slot.',
+      'Neem huisdieren mee, aangelijnd of in een mand.',
+      'Ga naar de afgesproken ontmoetingsplek of volg de instructies van de hulpdiensten en NL-Alert.',
+      'Laat je contactpersoon buiten de regio weten waar je bent.',
+      'Help buren die slecht ter been zijn, als dat veilig kan.',
+    ]
+  },
+  {
+    naam: 'Brand in huis',
+    alarm: true,
+    svg: SVG_BRAND,
+    stappen: [
+      'Blijf laag bij de grond — rook stijgt op en is giftiger dan het vuur zelf.',
+      'Waarschuw iedereen in huis en verlaat direct de woning via de kortste veilige route. Gebruik nooit de lift.',
+      'Doe deuren achter je dicht — dat vertraagt het vuur en de rook.',
+      'Bel buiten 112.',
+      'Alleen bij een kleine, beginnende brand en een vrije vluchtweg: blus met een blusdeken of brandblusser. Vlam in de pan? Deksel of blusdeken erop — nooit water.',
+      'Ga nooit terug naar binnen. Meld bij de brandweer of er nog mensen of dieren binnen zijn.',
+    ]
+  },
+];
+
+const SVG_HARTSTILSTAND = `<svg viewBox="0 0 320 175" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1A1A16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <line x1="18" y1="152" x2="302" y2="152" stroke="#9A9890" stroke-width="2"/>
+  <circle cx="50" cy="137" r="11"/>
+  <path d="M62 141 L150 143 L285 148"/>
+  <path d="M196 145 L282 150"/>
+  <path d="M104 142 L118 152"/>
+  <circle cx="158" cy="50" r="11"/>
+  <path d="M158 62 C172 80 190 108 200 144"/>
+  <path d="M200 144 L240 150"/>
+  <path d="M163 70 L126 130"/>
+  <path d="M152 73 L118 132"/>
+  <ellipse cx="121" cy="134" rx="12" ry="6"/>
+  <path d="M180 86 L164 114" stroke="#E24B4A"/>
+  <path d="M164 114 l9 -2 M164 114 l2 -9" stroke="#E24B4A"/>
+  <path d="M88 110 c-4 -7 -14 -5 -14 3 c0 6 8 10 14 15 c6 -5 14 -9 14 -15 c0 -8 -10 -10 -14 -3 z" stroke="#E24B4A" stroke-width="2.5"/>
+</svg>`;
+
+const SVG_CPR_HANDEN = `<svg viewBox="0 0 320 125" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1A1A16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M30 110 Q160 42 290 110" stroke="#9A9890" stroke-width="2"/>
+  <line x1="160" y1="58" x2="160" y2="70" stroke="#9A9890" stroke-width="2" stroke-dasharray="3 4"/>
+  <ellipse cx="160" cy="88" rx="24" ry="12"/>
+  <ellipse cx="160" cy="78" rx="21" ry="10"/>
+  <path d="M146 76 L174 76 M148 81 L172 81" stroke-width="2"/>
+  <line x1="160" y1="16" x2="160" y2="50" stroke="#E24B4A"/>
+  <path d="M160 50 l-6 -8 M160 50 l6 -8" stroke="#E24B4A"/>
+  <text x="186" y="30" font-size="12" fill="#6B6860" stroke="none" font-family="'DM Sans', sans-serif">5–6 cm diep</text>
+  <text x="186" y="46" font-size="12" fill="#6B6860" stroke="none" font-family="'DM Sans', sans-serif">100–120 / min</text>
+</svg>`;
+
+const SVG_HARTAANVAL = `<svg viewBox="0 0 320 175" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1A1A16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="160" cy="40" r="19"/>
+  <path d="M150 58 L148 70 M170 58 L172 70"/>
+  <path d="M72 168 Q76 104 116 88 L148 74 M172 74 L204 88 Q244 104 248 168"/>
+  <path d="M137 98 c-6 -9 -20 -7 -20 4 c0 9 11 15 20 22 c9 -7 20 -13 20 -22 c0 -11 -14 -13 -20 -4 z" fill="#FCEBEB" stroke="#E24B4A" stroke-width="2.5"/>
+  <path d="M104 92 l-9 -7 M100 112 l-11 1 M106 130 l-9 7" stroke="#E24B4A" stroke-width="2.5"/>
+  <path d="M170 92 l9 -7 M174 112 l11 1" stroke="#E24B4A" stroke-width="2.5"/>
+</svg>`;
+
+const SVG_ZIJLIGGING = `<svg viewBox="0 0 320 165" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1A1A16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <line x1="18" y1="146" x2="302" y2="146" stroke="#9A9890" stroke-width="2"/>
+  <circle cx="66" cy="116" r="12"/>
+  <path d="M58 126 Q48 134 56 140 L80 138"/>
+  <path d="M78 120 Q128 116 172 122"/>
+  <path d="M96 122 L118 144"/>
+  <path d="M172 122 L268 140"/>
+  <path d="M172 122 L210 96 L252 126"/>
+  <path d="M40 92 q6 -8 14 -4" stroke="#185FA5" stroke-width="2"/>
+  <path d="M48 80 q8 -10 18 -5" stroke="#185FA5" stroke-width="2"/>
+</svg>`;
+
+const SVG_VERSLIKKING = `<svg viewBox="0 0 320 175" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1A1A16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <line x1="30" y1="162" x2="290" y2="162" stroke="#9A9890" stroke-width="2"/>
+  <circle cx="92" cy="48" r="12"/>
+  <path d="M100 58 L130 108"/>
+  <path d="M130 108 L116 160 M130 108 L152 160"/>
+  <path d="M104 70 L92 96"/>
+  <circle cx="206" cy="40" r="11"/>
+  <path d="M204 51 L186 108"/>
+  <path d="M186 108 L176 160 M186 108 L206 160"/>
+  <path d="M198 64 Q160 74 124 88"/>
+  <path d="M196 78 Q162 86 128 96"/>
+  <ellipse cx="122" cy="92" rx="8" ry="6"/>
+  <path d="M112 110 L118 82" stroke="#E24B4A"/>
+  <path d="M118 82 l-8 3 M118 82 l0 9" stroke="#E24B4A"/>
+</svg>`;
+
+const SVG_BLOEDING = `<svg viewBox="0 0 320 165" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1A1A16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M44 102 L252 96"/>
+  <path d="M44 126 L252 122"/>
+  <path d="M252 96 q26 2 26 13 t-26 13 M258 100 l16 -8 M262 108 l18 -4"/>
+  <path d="M124 96 L182 94 L178 110 L126 112 Z" fill="#FFFFFF"/>
+  <path d="M148 102 l8 -2" stroke="#E24B4A" stroke-width="2.5"/>
+  <ellipse cx="152" cy="82" rx="20" ry="10"/>
+  <path d="M138 78 L166 76 M140 86 L164 84" stroke-width="2"/>
+  <path d="M160 72 Q172 50 196 42"/>
+  <path d="M112 60 L106 76 M192 58 L198 74" stroke="#E24B4A"/>
+  <path d="M106 76 l-1 -8 M106 76 l7 -4 M198 74 l1 -8 M198 74 l-7 -4" stroke="#E24B4A"/>
+</svg>`;
+
+const SVG_BRANDWOND = `<svg viewBox="0 0 320 175" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1A1A16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M196 24 h54 M222 24 v18 h-16 v12"/>
+  <path d="M199 62 q4 14 -1 28 q-2 8 1 16 M207 60 q5 16 0 32 q-2 10 1 18 M215 62 q5 14 0 28 q-2 8 1 14" stroke="#185FA5" stroke-width="2.5"/>
+  <path d="M60 136 L256 112"/>
+  <path d="M60 158 L256 134"/>
+  <path d="M196 118 q10 -3 18 2" stroke="#E24B4A" stroke-width="2.5"/>
+  <circle cx="74" cy="52" r="20"/>
+  <path d="M74 40 v12 l8 6"/>
+  <text x="56" y="92" font-size="12" fill="#6B6860" stroke="none" font-family="'DM Sans', sans-serif">10–20 min</text>
+</svg>`;
+
+const SVG_BOTBREUK = `<svg viewBox="0 0 320 160" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1A1A16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M64 88 L150 86 M170 86 L256 88"/>
+  <path d="M64 114 L148 114 M172 114 L256 114"/>
+  <path d="M150 86 l8 10 l-8 8 l8 10 M170 86 l-6 10 l8 8 l-6 10" stroke="#E24B4A" stroke-width="2.5"/>
+  <line x1="80" y1="70" x2="240" y2="70"/>
+  <line x1="80" y1="132" x2="240" y2="132"/>
+  <rect x="96" y="62" width="14" height="78" rx="6" fill="#FFFFFF"/>
+  <rect x="210" y="62" width="14" height="78" rx="6" fill="#FFFFFF"/>
+</svg>`;
+
+const SVG_SNELVERBAND = `<svg viewBox="0 0 320 165" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1A1A16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M40 98 L260 92"/>
+  <path d="M40 126 L260 122"/>
+  <path d="M96 96 L86 126 M122 95 L112 125 M148 95 L138 124 M174 94 L164 124" stroke-width="2.5"/>
+  <rect x="84" y="92" width="96" height="34" rx="6" stroke-width="2" stroke="#9A9890"/>
+  <circle cx="226" cy="56" r="14"/>
+  <circle cx="226" cy="56" r="6" stroke-width="2"/>
+  <path d="M214 64 Q196 80 182 92"/>
+</svg>`;
+
+const SVG_WONDVERBAND = `<svg viewBox="0 0 320 160" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1A1A16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M44 96 L268 90"/>
+  <path d="M44 124 L268 120"/>
+  <rect x="120" y="84" width="76" height="44" rx="8" fill="#FFFFFF"/>
+  <path d="M132 96 l52 0 M132 106 l52 0 M132 116 l52 0" stroke="#9A9890" stroke-width="2"/>
+  <path d="M112 80 l24 18 M204 80 l-24 18 M112 132 l24 -16 M204 132 l-24 -16" stroke="#EF9F27" stroke-width="5" opacity="0.7"/>
+</svg>`;
+
+const SVG_SCHAAFWOND = `<svg viewBox="0 0 320 170" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1A1A16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <line x1="30" y1="158" x2="290" y2="158" stroke="#9A9890" stroke-width="2"/>
+  <path d="M76 158 L120 92 Q126 82 138 82 L182 80 L214 158"/>
+  <circle cx="128" cy="92" r="2.5" fill="#E24B4A" stroke="none"/>
+  <circle cx="138" cy="88" r="2.5" fill="#E24B4A" stroke="none"/>
+  <circle cx="134" cy="98" r="2.5" fill="#E24B4A" stroke="none"/>
+  <circle cx="144" cy="94" r="2.5" fill="#E24B4A" stroke="none"/>
+  <path d="M126 44 q5 8 0 14 M140 38 q5 9 0 16 M154 44 q5 8 0 14" stroke="#185FA5" stroke-width="2.5"/>
+</svg>`;
+
+const SVG_VERSTUIKING = `<svg viewBox="0 0 320 160" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1A1A16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <line x1="24" y1="146" x2="296" y2="146" stroke="#9A9890" stroke-width="2"/>
+  <rect x="176" y="118" width="104" height="28" rx="12" stroke="#9A9890"/>
+  <path d="M48 144 L196 112"/>
+  <path d="M196 112 q14 -2 22 4 l18 2"/>
+  <rect x="178" y="80" width="48" height="22" rx="10" fill="#E6F1FB" stroke="#185FA5" stroke-width="2.5"/>
+  <path d="M202 85 v12 M196 88 l12 6 M208 88 l-12 6" stroke="#185FA5" stroke-width="1.8"/>
+</svg>`;
+
+const SVG_BEROERTE = `<svg viewBox="0 0 320 175" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1A1A16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="104" cy="82" r="46"/>
+  <circle cx="88" cy="70" r="4"/>
+  <circle cx="122" cy="70" r="4"/>
+  <path d="M84 100 Q102 104 116 112"/>
+  <path d="M120 116 l2 9 M120 116 l8 4" stroke="#E24B4A" stroke-width="2.5"/>
+  <circle cx="226" cy="44" r="12"/>
+  <path d="M226 56 L226 128"/>
+  <path d="M226 70 L292 62"/>
+  <path d="M226 70 Q252 86 262 112" stroke="#E24B4A"/>
+  <path d="M262 112 l-8 -4 M262 112 l1 -9" stroke="#E24B4A"/>
+  <text x="60" y="160" font-size="15" font-weight="500" fill="#6B6860" stroke="none" font-family="'DM Sans', sans-serif" letter-spacing="3">F · A · S · T</text>
+</svg>`;
+
+const SVG_VERGIFTIGING = `<svg viewBox="0 0 320 170" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1A1A16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M106 34 h24 v18 h8 q5 0 6 8 l6 66 q1 12 -11 12 h-42 q-12 0 -11 -12 l6 -66 q1 -8 6 -8 h8 z"/>
+  <path d="M100 78 h36" stroke-width="2" stroke="#9A9890"/>
+  <path d="M226 50 L262 116 L190 116 Z" stroke="#E24B4A"/>
+  <line x1="226" y1="74" x2="226" y2="96" stroke="#E24B4A"/>
+  <circle cx="226" cy="106" r="1.6" fill="#E24B4A" stroke="#E24B4A"/>
+</svg>`;
+
+const SVG_ONDERKOELING = `<svg viewBox="0 0 320 175" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1A1A16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <line x1="40" y1="156" x2="280" y2="156" stroke="#9A9890" stroke-width="2"/>
+  <circle cx="160" cy="50" r="13"/>
+  <path d="M160 64 Q122 88 114 156"/>
+  <path d="M160 64 Q198 88 206 156"/>
+  <path d="M132 100 Q160 92 188 100" stroke-width="2" stroke="#9A9890"/>
+  <path d="M118 48 q-6 4 -12 0 q-6 -4 -12 0 M214 48 q6 4 12 0 q6 -4 12 0" stroke-width="2"/>
+  <path d="M58 96 v28 M44 110 h28 M48 100 l20 20 M68 100 l-20 20" stroke="#185FA5" stroke-width="2.5"/>
+</svg>`;
+
+const SVG_HERSENSCHUDDING = `<svg viewBox="0 0 320 175" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1A1A16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="160" cy="104" r="48"/>
+  <circle cx="144" cy="94" r="4"/>
+  <circle cx="178" cy="94" r="4"/>
+  <path d="M146 126 h28" stroke-width="2.5"/>
+  <path d="M118 60 l-12 -12 M132 50 l-7 -15 M150 46 l-2 -16" stroke="#E24B4A" stroke-width="2.5"/>
+  <path d="M112 36 Q160 8 212 38" stroke-width="2" stroke="#9A9890" stroke-dasharray="2 7"/>
+  <circle cx="196" cy="26" r="5" stroke-width="2" stroke="#EF9F27"/>
+  <circle cx="130" cy="24" r="5" stroke-width="2" stroke="#EF9F27"/>
+</svg>`;
+
+const SVG_OVERVERHITTING = `<svg viewBox="0 0 320 175" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1A1A16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="62" cy="52" r="15" stroke="#EF9F27"/>
+  <path d="M62 26 v-8 M62 78 v8 M36 52 h-8 M88 52 h8 M44 34 l-6 -6 M80 34 l6 -6 M44 70 l-6 6 M80 70 l6 6" stroke="#EF9F27" stroke-width="2.5"/>
+  <line x1="60" y1="160" x2="260" y2="160" stroke="#9A9890" stroke-width="2"/>
+  <circle cx="160" cy="64" r="13"/>
+  <path d="M160 77 L160 124"/>
+  <path d="M160 124 L138 160 M160 124 L182 160"/>
+  <path d="M160 88 L134 110 M160 88 L186 110"/>
+  <path d="M132 56 c-5 8 -5 12 0 14 c5 -2 5 -6 0 -14 M190 64 c-5 8 -5 12 0 14 c5 -2 5 -6 0 -14" stroke="#185FA5" stroke-width="2.5"/>
+  <path d="M246 38 h12 v64 a15 15 0 1 1 -12 0 z"/>
+  <line x1="252" y1="58" x2="252" y2="112" stroke="#E24B4A" stroke-width="5"/>
+  <circle cx="252" cy="116" r="8" fill="#E24B4A" stroke="#E24B4A"/>
+</svg>`;
+
+const EHBO_DATA = [
+  {
+    naam: 'Hartstilstand & reanimatie',
+    urgentie: 'rood',
+    svg: SVG_HARTSTILSTAND,
+    stappen: [
+      'Controleer het bewustzijn: roep de persoon aan en schud zacht aan de schouders.',
+      'Geen reactie? Bel 112, zet de telefoon op luidspreker en laat iemand een AED halen.',
+      'Controleer maximaal 10 seconden de ademhaling: kijk, luister en voel.',
+      { tekst: 'Geen normale ademhaling? Start direct borstcompressies: handen midden op de borstkas, druk 5–6 cm diep in een tempo van 100–120 per minuut.', svg: SVG_CPR_HANDEN },
+      'Geef na elke 30 compressies 2 beademingen. Lukt beademen niet? Ga door met alleen compressies.',
+      'Zodra de AED er is: zet hem aan en volg de gesproken instructies op.',
+      'Ga door tot de ambulance het overneemt of de persoon weer normaal ademt.',
+    ]
+  },
+  {
+    naam: 'Hartaanval',
+    urgentie: 'rood',
+    svg: SVG_HARTAANVAL,
+    stappen: [
+      'Herken de signalen: drukkende pijn op de borst die kan uitstralen naar arm, kaak of rug, zweten, misselijkheid, kortademigheid.',
+      'Bel direct 112 en zeg dat je een hartaanval vermoedt.',
+      'Laat de persoon rustig half rechtop zitten, met gebogen knieën.',
+      'Maak knellende kleding los en stel de persoon gerust. Laat hem niet lopen.',
+      'Geef alleen medicijnen (zoals aspirine) als de meldkamer dat adviseert en de persoon niet allergisch is.',
+      'Raakt de persoon bewusteloos en ademt hij niet meer normaal? Start reanimatie.',
+    ]
+  },
+  {
+    naam: 'Bewusteloosheid',
+    urgentie: 'rood',
+    svg: SVG_ZIJLIGGING,
+    stappen: [
+      'Controleer of de omgeving veilig is.',
+      'Roep de persoon aan en schud zacht aan de schouders.',
+      'Geen reactie? Bel 112 en zet de telefoon op luidspreker.',
+      'Controleer maximaal 10 seconden de ademhaling: kijk, luister, voel.',
+      'Ademt hij normaal? Leg de persoon in stabiele zijligging (zie afbeelding) met het hoofd licht achterover, zodat de luchtweg vrij blijft.',
+      'Ademt hij niet of niet normaal? Start reanimatie: 30 borstcompressies, 2 beademingen.',
+      'Blijf de ademhaling controleren tot de hulpdiensten er zijn.',
+    ]
+  },
+  {
+    naam: 'Verslikking',
+    urgentie: 'rood',
+    svg: SVG_VERSLIKKING,
+    stappen: [
+      'Kan de persoon nog hoesten of praten? Moedig krachtig hoesten aan en doe verder niets.',
+      'Helpt hoesten niet? Laat de persoon voorover leunen en geef maximaal 5 stevige klappen tussen de schouderbladen met de hiel van je hand.',
+      'Nog steeds verstopt? Geef maximaal 5 buikstoten: sta achter de persoon, plaats je vuist tussen navel en borstbeen en trek krachtig naar je toe en omhoog.',
+      'Wissel af: 5 rugklappen, 5 buikstoten, tot het voorwerp loskomt.',
+      'Raakt de persoon bewusteloos? Bel 112 en start reanimatie.',
+      'Laat na buikstoten altijd een arts controleren, ook als alles goed lijkt.',
+    ]
+  },
+  {
+    naam: 'Beroerte',
+    urgentie: 'rood',
+    svg: SVG_BEROERTE,
+    stappen: [
+      'Doe de FAST-test. Face: vraag de persoon te lachen — hangt een mondhoek scheef? Arm: laat beide armen strekken — zakt er één weg? Speech: laat een zin nazeggen — klinkt het onsamenhangend? Time: noteer hoe laat de klachten begonnen.',
+      'Eén of meer signalen? Bel direct 112 en zeg dat je een beroerte vermoedt — elke minuut telt.',
+      'Laat de persoon rustig zitten of liggen met het hoofd iets verhoogd.',
+      'Geef niets te eten of te drinken — het slikken kan verstoord zijn.',
+      'Bewusteloos maar normale ademhaling? Leg de persoon in stabiele zijligging.',
+      'Geen normale ademhaling? Start reanimatie.',
+    ]
+  },
+  {
+    naam: 'Ernstige bloeding',
+    urgentie: 'rood',
+    svg: SVG_BLOEDING,
+    stappen: [
+      'Druk direct stevig op de wond met een schone doek of verband.',
+      'Blijf drukken — minimaal 10 minuten zonder loslaten.',
+      'Laat de persoon liggen en houd het bloedende lichaamsdeel indien mogelijk omhoog.',
+      'Bel 112 bij hevig bloedverlies of als het bloeden niet stopt.',
+      'Verwijder het verband nooit — bloedt het door, leg dan extra verband eroverheen.',
+    ]
+  },
+  {
+    naam: 'Vergiftiging',
+    urgentie: 'rood',
+    svg: SVG_VERGIFTIGING,
+    stappen: [
+      'Probeer te achterhalen wát is ingenomen, hoeveel en wanneer. Bewaar de verpakking of het restant voor de hulpverleners.',
+      'Bel direct 112 bij bewusteloosheid, benauwdheid of stuipen. In andere gevallen: bel meteen de huisarts of huisartsenpost voor advies.',
+      'Laat de persoon niet braken.',
+      'Bijtende stof ingeslikt (zoals ontstopper of schoonmaakmiddel)? Laat de mond spoelen en kleine slokjes water drinken.',
+      'Giftige stof op de huid of in de ogen? Spoel langdurig met lauw stromend water.',
+      'Raakt de persoon bewusteloos maar ademt hij normaal? Stabiele zijligging en ademhaling blijven controleren.',
+    ]
+  },
+  {
+    naam: 'Brandwond',
+    urgentie: 'oranje',
+    svg: SVG_BRANDWOND,
+    stappen: [
+      'Eerst water, de rest komt later: koel de brandwond 10 tot 20 minuten met lauw, zacht stromend water.',
+      'Verwijder tijdens het koelen sieraden en kleding rond de wond — behalve als ze aan de huid vastzitten.',
+      'Smeer niets op de wond: geen boter, zalf of tandpasta. Prik blaren niet door.',
+      'Dek de wond af met steriel verband, brandwondenfolie of een schone, niet-pluizende doek.',
+      'Bel 112 bij grote of diepe brandwonden, brandwonden in het gezicht of bij kinderen.',
+    ]
+  },
+  {
+    naam: 'Botbreuk',
+    urgentie: 'oranje',
+    svg: SVG_BOTBREUK,
+    stappen: [
+      'Beweeg het gewonde lichaamsdeel zo min mogelijk en laat de persoon zelf een comfortabele houding kiezen.',
+      'Ondersteun of stabiliseer de breuk, bijvoorbeeld met een spalk, opgerolde deken of mitella.',
+      'Dek open wonden af met een schone doek of steriel verband.',
+      'Koel bij zwelling met een coldpack in een doek — nooit direct op de huid.',
+      'Ga naar de spoedeisende hulp, of bel 112 bij een ernstige breuk, een breuk aan been of heup, of veel bloedverlies.',
+    ]
+  },
+  {
+    naam: 'Hersenschudding',
+    urgentie: 'oranje',
+    svg: SVG_HERSENSCHUDDING,
+    stappen: [
+      'Laat de persoon direct stoppen met sporten of activiteit en rust nemen.',
+      'Herken de signalen: hoofdpijn, misselijkheid, duizeligheid, verwardheid, kort bewustzijnsverlies of zich de klap niet herinneren.',
+      'Koel een buil met een coldpack in een doek — nooit direct op de huid.',
+      'Laat de persoon de eerste 24 uur niet alleen en houd hem in de gaten.',
+      'Bel direct 112 of de huisarts bij: braken, toenemende hoofdpijn, sufheid of moeilijk wakker te krijgen, stuipen, helder vocht uit neus of oor, of ongelijke pupillen.',
+      'Bouw rustig op: geen sport en weinig schermtijd tot de klachten weg zijn. Houden klachten aan? Naar de huisarts.',
+    ]
+  },
+  {
+    naam: 'Onderkoeling',
+    urgentie: 'oranje',
+    svg: SVG_ONDERKOELING,
+    stappen: [
+      'Herken de signalen: rillen, bleke koude huid, sloom of verward gedrag. Let op: bij ernstige onderkoeling stópt het rillen.',
+      'Breng de persoon naar een warme, droge plek uit de wind.',
+      'Vervang natte kleding voorzichtig door droge en wikkel de persoon in dekens — bedek ook het hoofd.',
+      'Geef een warme, zoete drank als de persoon goed bij bewustzijn is. Geen alcohol.',
+      'Warm geleidelijk op: niet wrijven over de huid en geen hete douche of kruik direct op de huid.',
+      'Is de persoon suf of verward, of is het rillen gestopt? Bel 112 en beweeg de persoon zo min mogelijk.',
+    ]
+  },
+  {
+    naam: 'Oververhitting',
+    urgentie: 'oranje',
+    svg: SVG_OVERVERHITTING,
+    stappen: [
+      'Herken hitte-uitputting: hevig zweten, hoofdpijn, duizeligheid, misselijkheid en spierkramp.',
+      'Breng de persoon naar een koele plek in de schaduw en laat hem liggen met de benen iets omhoog.',
+      'Maak knellende kleding los en koel af met natte doeken in de nek, oksels en liezen. Wapper frisse lucht toe.',
+      'Laat in kleine slokjes water of sportdrank drinken — alleen bij helder bewustzijn.',
+      'Herken een hitteberoerte: hete, rode, dróge huid, verwardheid of bewustzijnsverlies. Bel dan direct 112 en blijf actief koelen.',
+      'Geen verbetering binnen 30 minuten? Bel de huisarts.',
+    ]
+  },
+  {
+    naam: 'Snelverband aanleggen',
+    urgentie: 'groen',
+    svg: SVG_SNELVERBAND,
+    stappen: [
+      'Was je handen of trek wegwerphandschoenen aan als dat kan.',
+      'Open de verpakking en houd het snelverband alleen aan de zwachtels vast — raak het witte wondkussen niet aan.',
+      'Leg het wondkussen direct op de wond.',
+      'Wikkel eerst de korte zwachtel één keer rond, daarna de lange zwachtel dakpansgewijs over het hele kussen.',
+      'Niet te strak aanleggen: vingers of tenen moeten warm en roze blijven.',
+      'Zet vast met het haakje of kleefpleister. Bloedt het door? Leg een tweede verband eroverheen.',
+    ]
+  },
+  {
+    naam: 'Wond verbinden',
+    urgentie: 'groen',
+    svg: SVG_WONDVERBAND,
+    stappen: [
+      'Was je handen voordat je de wond aanraakt.',
+      'Spoel de wond schoon met lauw kraanwater.',
+      'Dep de huid rondom droog en ontsmet de wond eventueel met wonddesinfectiemiddel.',
+      'Leg een steriel gaasje op de wond — raak de kant die op de wond komt niet aan.',
+      'Zet het gaasje vast met kleefpleister of fixeer het met een zwachtel.',
+      'Ververs het verband dagelijks. Wordt de wond rood, dik, warm of pijnlijker? Ga naar de huisarts.',
+    ]
+  },
+  {
+    naam: 'Schaafwond',
+    urgentie: 'groen',
+    svg: SVG_SCHAAFWOND,
+    stappen: [
+      'Spoel de wond schoon onder lauw, stromend kraanwater.',
+      'Verwijder zichtbaar vuil voorzichtig — wrijf niet over de wond.',
+      'Dep de wond droog met een schone doek.',
+      'Laat de wond aan de lucht drogen of dek af met een niet-verklevend verband als kleding erlangs schuurt.',
+      'Zit er veel straatvuil in de wond? Controleer of je tetanusvaccinatie nog geldig is.',
+    ]
+  },
+  {
+    naam: 'Verstuiking',
+    urgentie: 'groen',
+    svg: SVG_VERSTUIKING,
+    stappen: [
+      'Rust — stop direct met belasten van het gewricht.',
+      'IJs of koude doek erop — maximaal 20 minuten per keer, met een doek ertussen.',
+      'Drukverband aanleggen met zwachtel om zwelling te beperken.',
+      'Hef het gewricht omhoog boven het niveau van het hart.',
+      'Geen verbetering na 2 dagen? Bezoek de huisarts.',
+    ]
+  },
+];
+
+const NOODPAKKET_DATA = [
+  {
+    categorie: 'Eten & drinken',
+    items: [
+      { id: 'water', naam: 'Drinkwater', sub: '', cat: 'drinken' },
+      { id: 'eten', naam: 'Lang houdbaar eten voor 3 dagen', sub: 'Te bereiden zonder stroom, gas of water — denk aan blik, crackers, noten', cat: 'voedsel' },
+    ]
+  },
+  {
+    categorie: 'Licht & energie',
+    items: [
+      { id: 'zaklamp', naam: 'Zaklamp', sub: 'Op batterijen of opwindbaar' },
+      { id: 'batterijen', naam: 'Reservebatterijen', sub: '', cat: 'overig' },
+      { id: 'powerbank', naam: 'Opgeladen powerbank', sub: '' },
+      { id: 'kaarsen', naam: 'Kaarsen of waxinelichtjes', sub: '' },
+      { id: 'lucifers', naam: 'Lucifers of aansteker', sub: 'Lucifers waterdicht verpakt' },
+    ]
+  },
+  {
+    categorie: 'Informatie & communicatie',
+    items: [
+      { id: 'radio', naam: 'Radio op batterijen of opwindbaar', sub: 'Voor de regionale rampenzender als stroom en internet uitvallen' },
+      { id: 'telefoonnummers', naam: 'Lijstje met belangrijke telefoonnummers', sub: 'Op papier' },
+      { id: 'identiteit', naam: 'Kopieën van identiteitsbewijzen', sub: '' },
+    ]
+  },
+  {
+    categorie: 'Veiligheid & verzorging',
+    items: [
+      { id: 'ehbo', naam: 'EHBO-doos', sub: '', cat: 'ehbo' },
+      { id: 'medicijnen', naam: 'Medicijnen die je gebruikt', sub: 'Voorraad voor minimaal 3 dagen', cat: 'medicijnen' },
+      { id: 'hygiene', naam: 'Toiletartikelen en vochtige doekjes', sub: '' },
+      { id: 'dekens', naam: 'Dekens of slaapzakken', sub: '' },
+      { id: 'fluitje', naam: 'Fluitje', sub: 'Om hulp mee te roepen' },
+      { id: 'gereedschap', naam: 'Gereedschapsset met blikopener', sub: '' },
+    ]
+  },
+  {
+    categorie: 'Geld & sleutels',
+    items: [
+      { id: 'geld', naam: 'Contant geld', sub: '' },
+      { id: 'sleutels', naam: 'Reservesleutels van huis en auto', sub: '' },
+    ]
+  },
+  {
+    categorie: 'Afhankelijk van jouw situatie',
+    items: [
+      { id: 'baby', naam: 'Babyvoeding en luiers', sub: 'Alleen als je een baby of peuter hebt', cat: 'voedsel' },
+      { id: 'huisdier', naam: 'Eten en drinken voor je huisdieren', sub: 'Alleen als je huisdieren hebt', cat: 'voedsel' },
+      { id: 'rugzak', naam: 'Waterdichte tas of rugzak', sub: 'Om alles in te bewaren — makkelijk mee te nemen bij evacuatie' },
+    ]
+  },
+];
+
+let npChecked = new Set(JSON.parse(localStorage.getItem('slimthuis_noodpakket') || '[]'));
+let huishouden = JSON.parse(localStorage.getItem('slimthuis_huishouden') || '{"volw":2,"kind":0}');
+
+function saveNoodpakket() {
+  localStorage.setItem('slimthuis_noodpakket', JSON.stringify([...npChecked]));
+}
+
+function updateHuishouden() {
+  huishouden.volw = Math.max(1, parseInt(document.getElementById('npVolw').value) || 1);
+  huishouden.kind = Math.max(0, parseInt(document.getElementById('npKind').value) || 0);
+  huishouden.dier = Math.max(0, parseInt(document.getElementById('npDier').value) || 0);
+  localStorage.setItem('slimthuis_huishouden', JSON.stringify(huishouden));
+  renderNoodpakket();
+}
+
+function toggleNpItem(id) {
+  if (npChecked.has(id)) { npChecked.delete(id); } else { npChecked.add(id); }
+  saveNoodpakket();
+  renderNoodpakket();
+}
+
+let npKoppeling = null;
+
+function npNaarVoorraad(id) {
+  const item = NOODPAKKET_DATA.flatMap(g => g.items).find(i => i.id === id);
+  if (!item) return;
+  npKoppeling = id;
+  document.getElementById('inputNaam').value = item.naam;
+  document.getElementById('inputCategorie').value = item.cat;
+  showTab('voorraad');
+  window.scrollTo(0, 0);
+  setTimeout(() => document.getElementById('inputDatum').focus(), 100);
+  showToast('Vul de houdbaarheidsdatum in en tik op Toevoegen');
+}
+
+function renderNoodpakket() {
+  const personen = huishouden.volw + huishouden.kind;
+  const liter = personen * 3 * 3;
+  const geld = huishouden.volw * 70 + huishouden.kind * 30;
+  huishouden.dier = huishouden.dier || 0;
+  document.getElementById('npVolw').value = huishouden.volw;
+  document.getElementById('npKind').value = huishouden.kind;
+  document.getElementById('npDier').value = huishouden.dier;
+  document.getElementById('npWater').textContent = liter + ' liter';
+  document.getElementById('npGeld').textContent = '€ ' + geld;
+
+  const subs = {
+    water: liter + ' liter voor jouw huishouden — 3 liter per persoon per dag, voor 3 dagen',
+    geld: '€ ' + geld + ' voor jouw huishouden — in verschillende biljetten en munten',
+  };
+
+  subs.huisdier = huishouden.dier > 0
+    ? `Eten en water voor 3 dagen, voor ${huishouden.dier} huisdier${huishouden.dier !== 1 ? 'en' : ''}`
+    : '';
+  subs.baby = huishouden.kind > 0 ? 'Alleen als je een baby of peuter hebt' : '';
+
+  let totaal = 0, gedaan = 0;
+  let html = '';
+  NOODPAKKET_DATA.forEach(groep => {
+    const zichtbaar = groep.items.filter(item =>
+      !(item.id === 'huisdier' && huishouden.dier === 0) &&
+      !(item.id === 'baby' && huishouden.kind === 0));
+    if (zichtbaar.length === 0) return;
+    html += `<div class="section-label">${groep.categorie}</div><div class="card">`;
+    zichtbaar.forEach(item => {
+      totaal++;
+      const checked = npChecked.has(item.id);
+      if (checked) gedaan++;
+      const sub = subs[item.id] || item.sub;
+      const gekoppeld = item.cat ? producten.filter(p => p.np === item.id) : [];
+      let linkHtml = '';
+      if (gekoppeld.length > 0) {
+        const metDatum = gekoppeld.filter(p => p.datum).sort((a, b) => a.datum.localeCompare(b.datum));
+        linkHtml = `<div class="check-link">✓ In je voorraad${metDatum.length ? ' — houdbaar tot ' + formatDate(metDatum[0].datum) : ''}</div>`;
+      }
+      const knop = (item.cat && gekoppeld.length === 0)
+        ? `<button class="np-add" onclick="event.stopPropagation(); npNaarVoorraad('${item.id}')">+ voorraad</button>` : '';
+      html += `<div class="check-row${checked ? ' checked' : ''}" onclick="toggleNpItem('${item.id}')">
+        <div class="checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <div class="check-body">
+          <div class="check-name">${item.naam}</div>
+          ${sub ? `<div class="check-sub">${sub}</div>` : ''}
+          ${linkHtml}
+        </div>
+        ${knop}
+      </div>`;
+    });
+    html += '</div>';
+  });
+  document.getElementById('noodpakketList').innerHTML = html;
+  document.getElementById('npCount').textContent = `${gedaan} van ${totaal} in huis`;
+  document.getElementById('npFill').style.width = (totaal ? (gedaan / totaal * 100) : 0) + '%';
+  renderScore();
+}
+
+const ALARM_NUMMERS = [
+  { naam: '112', sub: 'Politie, brandweer, ambulance — levensbedreigende spoed', tel: '112', rood: true },
+  { naam: 'Politie — geen spoed', sub: 'Aangifte, melding, wel politie nodig', tel: '0900-8844' },
+  { naam: '144 — Red een dier', sub: 'Dier in nood', tel: '144' },
+  { naam: '113 Zelfmoordpreventie', sub: 'Dag en nacht bereikbaar, gratis — ook chat via 113.nl', tel: '0800-0113' },
+];
+
+const EIGEN_NUMMER_VELDEN = [
+  { id: 'huisarts', label: 'Huisarts' },
+  { id: 'hap', label: 'Huisartsenpost (avond/weekend)' },
+  { id: 'apotheek', label: 'Apotheek' },
+  { id: 'ice1', label: 'Noodcontact 1 (ICE)' },
+  { id: 'ice2', label: 'Noodcontact 2 (ICE)' },
+];
+
+const NOODPLAN_VELDEN = [
+  { id: 'plek', label: 'Ontmoetingsplek bij evacuatie', hint: 'Bijv. de parkeerplaats bij de supermarkt — spreek dit af met je huisgenoten' },
+  { id: 'contact', label: 'Contactpersoon buiten de regio', hint: 'Naam en nummer van iemand verder weg, als lokaal bellen niet lukt' },
+  { id: 'pakket', label: 'Waar ligt het noodpakket?', hint: 'Bijv. in de meterkast of onder de trap' },
+  { id: 'kranen', label: 'Waar zitten de hoofdkranen?', hint: 'Gas, water en de hoofdschakelaar van elektra' },
+];
+
+let eigenNummers = JSON.parse(localStorage.getItem('slimthuis_nummers') || '{}');
+let noodplan = JSON.parse(localStorage.getItem('slimthuis_noodplan') || '{}');
+
+function escAttr(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+
+function renderNoodplan() {
+  const belIcon = '<svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.6 2.81.72A2 2 0 0 1 22 16.92z"/></svg>';
+
+  document.getElementById('alarmNummers').innerHTML = ALARM_NUMMERS.map(n => `
+    <div class="tel-row">
+      <div class="tel-body">
+        <div class="tel-naam">${n.naam}</div>
+        <div class="tel-sub">${n.sub}</div>
+      </div>
+      <div class="tel-nummer">${n.tel}</div>
+      <a class="tel-bel${n.rood ? ' rood' : ''}" href="tel:${n.tel.replace(/-/g, '')}">${belIcon}</a>
+    </div>`).join('');
+
+  document.getElementById('eigenNummers').innerHTML = EIGEN_NUMMER_VELDEN.map(v => {
+    const waarde = eigenNummers[v.id] || '';
+    const schoon = waarde.replace(/[^+0-9]/g, '');
+    return `
+    <div class="eigen-row">
+      <label>${v.label}</label>
+      <div class="eigen-top">
+        <input type="tel" inputmode="tel" placeholder="Telefoonnummer" value="${escAttr(waarde)}" onchange="saveEigenNummer('${v.id}', this.value)">
+        ${schoon ? `<a class="tel-bel" href="tel:${escAttr(schoon)}">${belIcon}</a>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('noodplanVelden').innerHTML = NOODPLAN_VELDEN.map(v => `
+    <div class="plan-row">
+      <label>${v.label}</label>
+      <textarea rows="1" placeholder="${escAttr(v.hint)}" onchange="saveNoodplanVeld('${v.id}', this.value)" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'">${escAttr(noodplan[v.id] || '')}</textarea>
+    </div>`).join('');
+}
+
+function saveEigenNummer(id, waarde) {
+  eigenNummers[id] = waarde.trim();
+  localStorage.setItem('slimthuis_nummers', JSON.stringify(eigenNummers));
+  renderNoodplan();
+  renderScore();
+  showToast('Nummer opgeslagen');
+}
+
+function saveNoodplanVeld(id, waarde) {
+  noodplan[id] = waarde.trim();
+  localStorage.setItem('slimthuis_noodplan', JSON.stringify(noodplan));
+  renderScore();
+  showToast('Noodplan opgeslagen');
+}
+
+// ============================================================
+// SYNCHRONISATIE (optioneel) — Supabase
+// Vul hieronder de URL en anon-sleutel van je Supabase-project in.
+// Zie SYNC-SETUP.md voor de stappen. Leeg laten = app werkt
+// gewoon lokaal, zonder account.
+// ============================================================
+const SYNC_URL = '';   // bijv. 'https://abcdefgh.supabase.co'
+const SYNC_KEY = '';   // de 'anon public' sleutel
+
+let sb = null;                 // supabase client
+let syncSessie = null;         // ingelogde gebruiker
+let syncInfo = JSON.parse(localStorage.getItem('slimthuis_sync') || 'null'); // {huishoudenId, code}
+let syncTimer = null;
+let syncBezig = false;         // voorkomt lussen bij het toepassen van binnenkomende data
+let syncLaatst = null;
+const syncClientId = Math.random().toString(36).slice(2);
+
+function syncGeconfigureerd() { return SYNC_URL.startsWith('https://') && SYNC_KEY.length > 20; }
+
+function laadSupabase() {
+  return new Promise((ok, nee) => {
+    if (window.supabase) return ok();
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+    s.onload = () => ok();
+    s.onerror = () => nee(new Error('offline'));
+    document.head.appendChild(s);
+  });
+}
+
+async function initSync() {
+  if (!syncGeconfigureerd()) { renderSync(); return; }
+  try {
+    await laadSupabase();
+    sb = window.supabase.createClient(SYNC_URL, SYNC_KEY);
+    const { data } = await sb.auth.getSession();
+    syncSessie = data.session;
+    sb.auth.onAuthStateChange((_ev, sessie) => { syncSessie = sessie; renderSync(); });
+    if (syncSessie && syncInfo) { await syncOphalen(); syncLuisteren(); }
+    renderSync();
+  } catch (e) {
+    renderSync('Geen verbinding — synchronisatie hervat zodra er internet is.');
+  }
+}
+
+function verzamelState() {
+  return {
+    producten, npChecked: [...npChecked], huishouden,
+    eigenNummers, noodplan, checks,
+    bijgewerkt: new Date().toISOString(), door: syncClientId
+  };
+}
+
+function pasStateToe(s) {
+  if (!s || typeof s !== 'object') return;
+  syncBezig = true;
+  try {
+    if (Array.isArray(s.producten)) { producten = s.producten; saveProducten(); }
+    if (Array.isArray(s.npChecked)) { npChecked = new Set(s.npChecked); localStorage.setItem('slimthuis_noodpakket', JSON.stringify(s.npChecked)); }
+    if (s.huishouden) { huishouden = s.huishouden; localStorage.setItem('slimthuis_huishouden', JSON.stringify(huishouden)); }
+    if (s.eigenNummers) { eigenNummers = s.eigenNummers; localStorage.setItem('slimthuis_nummers', JSON.stringify(eigenNummers)); }
+    if (s.noodplan) { noodplan = s.noodplan; localStorage.setItem('slimthuis_noodplan', JSON.stringify(noodplan)); }
+    if (s.checks) { checks = s.checks; localStorage.setItem('slimthuis_checks', JSON.stringify(checks)); }
+    renderProducten(); updateStats(); renderTodayAlerts(); renderNoodpakket(); renderNoodplan();
+  } finally { syncBezig = false; }
+}
+
+function scheduleSync() {
+  if (syncBezig || !sb || !syncSessie || !syncInfo) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(syncVersturen, 1500);
+}
+
+async function syncVersturen() {
+  if (!sb || !syncSessie || !syncInfo) return;
+  try {
+    const { error } = await sb.from('huishoudens')
+      .update({ data: verzamelState(), bijgewerkt: new Date().toISOString() })
+      .eq('id', syncInfo.huishoudenId);
+    if (!error) { syncLaatst = new Date(); renderSync(); }
+  } catch (e) { /* offline — volgende wijziging probeert opnieuw */ }
+}
+
+async function syncOphalen() {
+  const { data, error } = await sb.from('huishoudens')
+    .select('data, code').eq('id', syncInfo.huishoudenId).single();
+  if (!error && data) {
+    syncInfo.code = data.code;
+    localStorage.setItem('slimthuis_sync', JSON.stringify(syncInfo));
+    if (data.data && data.data.bijgewerkt) pasStateToe(data.data);
+    syncLaatst = new Date();
+  }
+}
+
+function syncLuisteren() {
+  sb.channel('huishouden-' + syncInfo.huishoudenId)
+    .on('postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'huishoudens', filter: 'id=eq.' + syncInfo.huishoudenId },
+      (payload) => {
+        const s = payload.new && payload.new.data;
+        if (s && s.door !== syncClientId) { pasStateToe(s); syncLaatst = new Date(); renderSync(); showToast('Bijgewerkt door huisgenoot'); }
+      })
+    .subscribe();
+}
+
+async function syncLogin() {
+  const email = document.getElementById('syncEmail').value.trim();
+  if (!email.includes('@')) { showToast('Vul een geldig e-mailadres in'); return; }
+  try {
+    const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.href.split('#')[0] } });
+    if (error) throw error;
+    renderSync('Inloglink verstuurd naar ' + email + ' — open de link op dit apparaat.');
+  } catch (e) { showToast('Versturen mislukt: ' + (e.message || 'probeer later opnieuw')); }
+}
+
+async function syncStartHuishouden() {
+  try {
+    const { data, error } = await sb.rpc('start_huishouden', { begin_data: verzamelState() });
+    if (error) throw error;
+    const rij = Array.isArray(data) ? data[0] : data;
+    syncInfo = { huishoudenId: rij.id, code: rij.code };
+    localStorage.setItem('slimthuis_sync', JSON.stringify(syncInfo));
+    syncLaatst = new Date();
+    syncLuisteren(); renderSync();
+    showToast('Huishouden gestart — deel de code met je huisgenoten');
+  } catch (e) { showToast('Mislukt: ' + (e.message || 'probeer opnieuw')); }
+}
+
+async function syncSluitAan() {
+  const code = document.getElementById('syncCode').value.trim();
+  if (code.length < 4) { showToast('Vul de deelcode in'); return; }
+  try {
+    const { data, error } = await sb.rpc('sluit_aan', { invitecode: code });
+    if (error) throw error;
+    syncInfo = { huishoudenId: data, code: code.toUpperCase() };
+    localStorage.setItem('slimthuis_sync', JSON.stringify(syncInfo));
+    await syncOphalen();
+    syncLuisteren(); renderSync();
+    showToast('Aangesloten — de gedeelde gegevens zijn overgenomen');
+  } catch (e) { showToast(e.message === 'Code niet gevonden' ? 'Code niet gevonden' : 'Aansluiten mislukt'); }
+}
+
+async function syncUitloggen() {
+  if (sb) await sb.auth.signOut();
+  syncSessie = null;
+  renderSync();
+  showToast('Uitgelogd — je gegevens blijven lokaal bewaard');
+}
+
+function renderSync(melding) {
+  const el = document.getElementById('syncCard');
+  if (!el) return;
+  if (!syncGeconfigureerd()) {
+    el.innerHTML = `<div class="sync-tekst">Wil je je voorraad en noodplan delen met huisgenoten en synchroniseren tussen apparaten? Koppel dan een (gratis) Supabase-project — zie <strong>SYNC-SETUP.md</strong> in de projectmap. Zonder koppeling werkt alles gewoon lokaal op dit apparaat.</div>`;
+    return;
+  }
+  if (melding) { el.innerHTML = `<div class="sync-tekst">${melding}</div>`; return; }
+  if (!sb) {
+    el.innerHTML = `<div class="sync-tekst">Geen verbinding — synchronisatie hervat zodra er internet is. Alles blijft intussen gewoon lokaal werken.</div>`;
+    return;
+  }
+  if (!syncSessie) {
+    el.innerHTML = `
+      <div class="sync-tekst">Log in om je gegevens te synchroniseren tussen apparaten en te delen met huisgenoten. Je ontvangt een inloglink per e-mail — geen wachtwoord nodig.</div>
+      <div class="sync-rij"><input type="email" id="syncEmail" placeholder="jouw@email.nl"><button class="sync-knop" onclick="syncLogin()">Stuur link</button></div>`;
+    return;
+  }
+  if (!syncInfo) {
+    el.innerHTML = `
+      <div class="sync-tekst">Ingelogd als <strong>${syncSessie.user.email}</strong>. Start een huishouden (jouw huidige gegevens worden gedeeld) of sluit aan bij dat van een huisgenoot.</div>
+      <div class="sync-rij"><button class="sync-knop" style="flex:1" onclick="syncStartHuishouden()">Start een huishouden</button></div>
+      <div class="sync-rij"><input id="syncCode" placeholder="Deelcode, bijv. A3F9K2" style="text-transform:uppercase"><button class="sync-knop stil" onclick="syncSluitAan()">Sluit aan</button></div>
+      <div class="sync-rij"><button class="sync-knop stil" style="flex:1" onclick="syncUitloggen()">Uitloggen</button></div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div class="sync-tekst">Synchronisatie staat aan voor <strong>${syncSessie.user.email}</strong>. Huisgenoot toevoegen? Laat diegene inloggen en deze deelcode invoeren:</div>
+    <div class="sync-code">${syncInfo.code || '······'}</div>
+    <div class="sync-status">${syncLaatst ? 'Laatst gesynchroniseerd: ' + syncLaatst.toLocaleTimeString('nl-NL', {hour:'2-digit',minute:'2-digit'}) : 'Wijzigingen worden automatisch gesynchroniseerd'}</div>
+    <div class="sync-rij"><button class="sync-knop stil" style="flex:1" onclick="syncUitloggen()">Uitloggen</button></div>`;
+}
+
+let checks = JSON.parse(localStorage.getItem('slimthuis_checks') || '{}');
+
+function dagenSinds(iso) {
+  if (!iso) return Infinity;
+  return Math.floor((new Date() - new Date(iso)) / 86400000);
+}
+
+function markCheckDone(key, naam) {
+  checks[key] = new Date().toISOString().slice(0, 10);
+  localStorage.setItem('slimthuis_checks', JSON.stringify(checks));
+  renderTodayAlerts();
+  showToast(naam + ' afgevinkt');
+}
+
+function berekenScore() {
+  const items = NOODPAKKET_DATA.flatMap(g => g.items).filter(i =>
+    !(i.id === 'huisdier' && (huishouden.dier || 0) === 0) &&
+    !(i.id === 'baby' && huishouden.kind === 0));
+  const np = items.length ? Math.round(items.filter(i => npChecked.has(i.id)).length / items.length * 100) : 0;
+  const totVelden = EIGEN_NUMMER_VELDEN.length + NOODPLAN_VELDEN.length;
+  const ingevuld = EIGEN_NUMMER_VELDEN.filter(v => (eigenNummers[v.id] || '').trim()).length
+                 + NOODPLAN_VELDEN.filter(v => (noodplan[v.id] || '').trim()).length;
+  const plan = Math.round(ingevuld / totVelden * 100);
+  const basisCats = ['voedsel', 'drinken', 'ehbo', 'medicijnen'];
+  const vr = Math.round(basisCats.filter(c =>
+    producten.some(p => p.categorie === c && (!p.datum || getDaysUntil(p.datum) >= 0))
+  ).length / basisCats.length * 100);
+  return { vr, np, plan, totaal: Math.round((vr + np + plan) / 3) };
+}
+
+function renderScore() {
+  const el = document.getElementById('scoreCard');
+  if (!el) return;
+  const s = berekenScore();
+  const kleur = v => v >= 80 ? 'var(--green)' : v >= 40 ? '#EF9F27' : '#E24B4A';
+  const rij = (label, v) => `<div class="score-row">
+    <div class="score-label">${label}</div>
+    <div class="score-bar"><div class="score-fill" style="width:${v}%;background:${kleur(v)}"></div></div>
+    <div class="score-pct">${v}%</div>
+  </div>`;
+  el.innerHTML = `
+    <div class="score-totaal"><div class="score-num">${s.totaal}%</div><div class="score-sub">voorbereid — rustig verder bouwen</div></div>
+    ${rij('Voorraad', s.vr)}${rij('Noodpakket', s.np)}${rij('Noodplan', s.plan)}`;
+}
+
+function renderRotatie() {
+  const el = document.getElementById('rotatieList');
+  if (!el) return;
+  const binnenkort = producten
+    .filter(p => p.datum && getDaysUntil(p.datum) >= 0 && getDaysUntil(p.datum) <= 60)
+    .sort((a, b) => a.datum.localeCompare(b.datum))
+    .slice(0, 5);
+  if (binnenkort.length === 0) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="section-label">Gebruik eerst</div><div class="card">` +
+    binnenkort.map(p => {
+      const d = getDaysUntil(p.datum);
+      return `<div class="rotatie-row">
+        <div class="urgency-dot" style="background:${d <= 14 ? '#E24B4A' : '#EF9F27'}"></div>
+        <div class="rotatie-naam">${p.aantal > 1 ? p.aantal + '× ' : ''}${p.naam}</div>
+        <div class="rotatie-dagen">${d === 0 ? 'vandaag' : 'over ' + d + ' dag' + (d !== 1 ? 'en' : '')}</div>
+      </div>`;
+    }).join('') + '</div>';
+}
+
+let producten = JSON.parse(localStorage.getItem('slimthuis_producten') || '[]');
+
+function saveProducten() {
+  localStorage.setItem('slimthuis_producten', JSON.stringify(producten));
+}
+
+function getDaysUntil(dateStr) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const d = new Date(dateStr); d.setHours(0,0,0,0);
+  return Math.round((d - today) / (1000*60*60*24));
+}
+
+function getDotClass(days) {
+  if (days <= 7) return 'red';
+  if (days <= 30) return 'amber';
+  return 'green';
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  const days = getDaysUntil(dateStr);
+  if (days < 0) return 'Verlopen';
+  if (days === 0) return 'Vandaag';
+  if (days === 1) return 'Morgen';
+  if (days < 30) return days + ' dagen';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' });
+}
+
+function renderProducten() {
+  const list = document.getElementById('productList');
+  if (producten.length === 0) {
+    list.innerHTML = '<div class="card"><div class="empty">Nog geen producten. Voeg je eerste product toe.</div></div>';
+    return;
+  }
+  const sorted = [...producten].sort((a, b) => {
+    if (!a.datum) return 1; if (!b.datum) return -1;
+    return new Date(a.datum) - new Date(b.datum);
+  });
+  let html = '<div class="card">';
+  sorted.forEach((p, i) => {
+    const days = p.datum ? getDaysUntil(p.datum) : 999;
+    const dot = getDotClass(days);
+    const idx = producten.findIndex(x => x.id === p.id);
+    html += `<div class="product-row">
+      <div class="dot ${dot}"></div>
+      <div class="product-info">
+        <div class="product-name">${p.naam}</div>
+        <div class="product-meta">${p.categorie} · ${p.aantal}x</div>
+      </div>
+      <div class="product-date">${p.datum ? formatDate(p.datum) : '—'}</div>
+      <button class="product-delete" onclick="deleteProduct(${idx})" title="Verwijderen">
+        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+      </button>
+    </div>`;
+  });
+  html += '</div>';
+  list.innerHTML = html;
+}
+
+function deleteProduct(idx) {
+  producten.splice(idx, 1);
+  saveProducten();
+  renderProducten();
+  updateStats();
+  renderTodayAlerts();
+  renderNoodpakket();
+  showToast('Product verwijderd');
+}
+
+function addProduct() {
+  const naam = document.getElementById('inputNaam').value.trim();
+  const categorie = document.getElementById('inputCategorie').value;
+  const aantal = parseInt(document.getElementById('inputAantal').value) || 1;
+  const datum = document.getElementById('inputDatum').value;
+  if (!naam) { showToast('Vul een productnaam in'); return; }
+  const nieuw = { id: Date.now(), naam, categorie, aantal, datum };
+  if (npKoppeling) {
+    nieuw.np = npKoppeling;
+    npChecked.add(npKoppeling);
+    saveNoodpakket();
+    npKoppeling = null;
+  }
+  producten.push(nieuw);
+  renderNoodpakket();
+  saveProducten();
+  renderProducten();
+  updateStats();
+  renderTodayAlerts();
+  document.getElementById('inputNaam').value = '';
+  document.getElementById('inputAantal').value = '1';
+  document.getElementById('inputDatum').value = '';
+  showToast('Product toegevoegd');
+}
+
+function updateStats() {
+  const total = producten.length;
+  const expiring = producten.filter(p => p.datum && getDaysUntil(p.datum) <= 30 && getDaysUntil(p.datum) >= 0).length;
+  const voedsel = producten.filter(p => p.categorie === 'voedsel' || p.categorie === 'drinken');
+  const days = voedsel.length > 0 ? Math.min(voedsel.length * 2, 90) : 0;
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statExpiring').textContent = expiring;
+  document.getElementById('statDays').textContent = days > 0 ? days : '—';
+  renderRotatie();
+  renderScore();
+}
+
+function renderTodayAlerts() {
+  const container = document.getElementById('todayAlerts');
+  const today = new Date();
+  let html = '';
+
+  const doenKnop = (key, naam) => `<button class="alert-doen" onclick="event.stopPropagation(); markCheckDone('${key}', '${naam}')">✓ Gedaan</button>`;
+
+  // Terugkerende checks
+  if (dagenSinds(checks.rookmelder) >= 30) {
+    html += `<div class="alert blue">
+      <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <div class="alert-body"><div class="alert-title">Rookmelder testen</div><div class="alert-sub">${checks.rookmelder ? 'Laatste test ' + dagenSinds(checks.rookmelder) + ' dagen geleden' : 'Druk op de testknop van elke melder — duurt een minuut'}</div></div>
+      ${doenKnop('rookmelder', 'Rookmelder')}
+    </div>`;
+  }
+  if (dagenSinds(checks.noodpakket) >= 182) {
+    html += `<div class="alert blue">
+      <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+      <div class="alert-body"><div class="alert-title">Halfjaarlijkse noodpakket-check</div><div class="alert-sub">Voorraad compleet? Alles nog houdbaar? Powerbank opgeladen?</div></div>
+      ${doenKnop('noodpakket', 'Noodpakket-check')}
+    </div>`;
+  }
+
+  // Seizoensmeldingen
+  const month = today.getMonth() + 1;
+  if (month === 10) {
+    html += `<div class="alert blue"><svg viewBox="0 0 24 24"><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><div class="alert-body"><div class="alert-title">Oktober wintercheck</div><div class="alert-sub">Winterbanden, verwarmingsketel, antivries checken</div></div></div>`;
+  }
+  if (month === 1) {
+    html += `<div class="alert amber"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><div class="alert-body"><div class="alert-title">Brandveiligheid check</div><div class="alert-sub">Brandblusser en rookmelder controleren</div></div></div>`;
+  }
+  if (month >= 6 && month <= 8) {
+    html += `<div class="alert blue"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg><div class="alert-body"><div class="alert-title">Zomer: denk aan hitte</div><div class="alert-sub">Voldoende water in voorraad? Zie ook Oververhitting in de Noodgids</div></div></div>`;
+  }
+
+  // Producten: verlopen en bijna verlopen, met naam en dagen
+  const metDatum = producten.filter(p => p.datum);
+  const verlopen = metDatum.filter(p => getDaysUntil(p.datum) < 0);
+  const bijna = metDatum.filter(p => getDaysUntil(p.datum) >= 0 && getDaysUntil(p.datum) <= 14)
+    .sort((a, b) => a.datum.localeCompare(b.datum));
+
+  verlopen.slice(0, 3).forEach(p => {
+    html += `<div class="alert red"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><div class="alert-body"><div class="alert-title">${p.naam} is verlopen</div><div class="alert-sub">Vervangen of weggooien</div></div></div>`;
+  });
+  if (verlopen.length > 3) {
+    html += `<div class="alert red"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><div class="alert-body"><div class="alert-title">Nog ${verlopen.length - 3} andere producten verlopen</div><div class="alert-sub">Bekijk je voorraad</div></div></div>`;
+  }
+  bijna.slice(0, 3).forEach(p => {
+    const days = getDaysUntil(p.datum);
+    html += `<div class="alert amber"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><div class="alert-body"><div class="alert-title">${p.naam} verloopt ${days === 0 ? 'vandaag' : 'over ' + days + ' dag' + (days !== 1 ? 'en' : '')}</div><div class="alert-sub">Opmaken of vervangen — zie "Gebruik eerst" bij Voorraad</div></div></div>`;
+  });
+
+  if (!html) {
+    html = `<div class="alert green"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg><div class="alert-body"><div class="alert-title">Alles in orde</div><div class="alert-sub">Geen meldingen vandaag</div></div></div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+function renderEhbo() {
+  const list = document.getElementById('ehboList');
+  const groepen = [
+    { key: 'rood',   label: 'Levensbedreigend — bel 112', kleur: '#E24B4A' },
+    { key: 'oranje', label: 'Ernstig — snel handelen',    kleur: '#EF9F27' },
+    { key: 'groen',  label: 'Wondverzorging & kleine letsels', kleur: '#639922' },
+  ];
+  let html = '';
+  groepen.forEach(g => {
+    const items = EHBO_DATA.map((item, i) => ({ item, i })).filter(x => x.item.urgentie === g.key);
+    if (items.length === 0) return;
+    html += `<div class="section-label">${g.label}</div><div class="card">`;
+    items.forEach(({ item, i }) => {
+      html += `<div class="ehbo-item" onclick="openEhbo(${i})">
+        <div class="urgency-dot" style="background:${g.kleur}"></div>
+        <div class="ehbo-name">${item.naam}</div>
+        <div class="ehbo-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+      </div>`;
+    });
+    html += '</div>';
+  });
+  html += `<div class="section-label">Scenario's — wat doe ik bij…</div><div class="card">`;
+  SCENARIO_DATA.forEach((item, i) => {
+    html += `<div class="ehbo-item" onclick="openScenario(${i})">
+      <div class="urgency-dot" style="background:#185FA5"></div>
+      <div class="ehbo-name">${item.naam}</div>
+      <div class="ehbo-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>`;
+  });
+  html += '</div>';
+  html += `<div class="ehbo-note">Deze stappen zijn een geheugensteun en vervangen geen EHBO-cursus.<br>Bel bij twijfel altijd 112 of de huisartsenpost. Alles werkt offline.</div>`;
+  list.innerHTML = html;
+}
+
+function openEhbo(idx) {
+  const item = EHBO_DATA[idx];
+  const detail = document.getElementById('ehboDetail');
+  const list = document.getElementById('ehboList');
+  let html = `<button class="back-btn" onclick="closeEhbo()"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg> Terug</button>`;
+  if (item.urgentie === 'rood') {
+    html += `<div class="alert red">
+      <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.6 2.81.72A2 2 0 0 1 22 16.92z"/></svg>
+      <div class="alert-body"><div class="alert-title">Levensbedreigend — bel direct 112</div></div>
+    </div>`;
+  }
+  html += `<div class="card"><div class="card-header"><div class="card-title">${item.naam}</div></div>`;
+  if (item.svg) {
+    html += `<div class="ehbo-illu">${item.svg}</div>`;
+  }
+  item.stappen.forEach((stap, i) => {
+    const tekst = typeof stap === 'string' ? stap : stap.tekst;
+    let stapHtml = `<div class="step-text">${tekst}`;
+    if (typeof stap === 'object' && stap.svg) {
+      stapHtml += `<div class="step-illu">${stap.svg}</div>`;
+    }
+    stapHtml += `</div>`;
+    html += `<div class="ehbo-step"><div class="step-num">${i+1}</div>${stapHtml}</div>`;
+  });
+  html += '</div>';
+  detail.innerHTML = html;
+  list.style.display = 'none';
+  detail.classList.add('open');
+  window.scrollTo(0, 0);
+}
+
+function openScenario(idx) {
+  const item = SCENARIO_DATA[idx];
+  const detail = document.getElementById('ehboDetail');
+  const list = document.getElementById('ehboList');
+  let html = `<button class="back-btn" onclick="closeEhbo()"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg> Terug</button>`;
+  if (item.alarm) {
+    html += `<div class="alert red">
+      <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.6 2.81.72A2 2 0 0 1 22 16.92z"/></svg>
+      <div class="alert-body"><div class="alert-title">Levensbedreigend — bel direct 112</div></div>
+    </div>`;
+  }
+  html += `<div class="card"><div class="card-header"><div class="card-title">${item.naam}</div></div>`;
+  if (item.svg) { html += `<div class="ehbo-illu">${item.svg}</div>`; }
+  item.stappen.forEach((stap, i) => {
+    html += `<div class="ehbo-step"><div class="step-num">${i+1}</div><div class="step-text">${stap}</div></div>`;
+  });
+  html += '</div>';
+  detail.innerHTML = html;
+  list.style.display = 'none';
+  detail.classList.add('open');
+  window.scrollTo(0, 0);
+}
+
+function closeEhbo() {
+  document.getElementById('ehboList').style.display = '';
+  document.getElementById('ehboDetail').classList.remove('open');
+}
+
+function showTab(tab) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  const navItem = document.querySelector(`.nav-item[onclick*="'${tab}'"]`);
+  if (navItem) navItem.classList.add('active');
+  if (tab === 'ehbo') { closeEhbo(); }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+let scanStream = null;
+let scanTimer = null;
+
+async function startScan() {
+  const modal = document.getElementById('scanModal');
+  const status = document.getElementById('scanStatus');
+  const video = document.getElementById('scanVideo');
+  modal.classList.add('open');
+  status.textContent = 'Camera starten…';
+  try {
+    scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.srcObject = scanStream;
+    await video.play();
+    if ('BarcodeDetector' in window) {
+      status.textContent = 'Richt de camera op de barcode';
+      const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] });
+      scanTimer = setInterval(async () => {
+        try {
+          const codes = await detector.detect(video);
+          if (codes.length > 0) {
+            const code = codes[0].rawValue;
+            stopScan();
+            zoekBarcode(code);
+          }
+        } catch (e) { /* frame overslaan */ }
+      }, 300);
+    } else {
+      status.textContent = 'Deze browser ondersteunt geen automatisch scannen — typ de barcode hieronder.';
+    }
+  } catch (e) {
+    status.textContent = 'Geen toegang tot de camera — typ de barcode hieronder, of vul het product handmatig in.';
+  }
+}
+
+function stopScan() {
+  if (scanTimer) { clearInterval(scanTimer); scanTimer = null; }
+  if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
+  document.getElementById('scanModal').classList.remove('open');
+  document.getElementById('scanHandmatig').value = '';
+}
+
+async function zoekBarcode(code) {
+  if (!code || !/^\d{6,14}$/.test(code)) { showToast('Geen geldige barcode'); return; }
+  stopScan();
+  showToast('Product opzoeken…');
+  try {
+    const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,product_name_nl,brands,quantity`);
+    const d = await r.json();
+    if (d.status === 1 && d.product) {
+      const p = d.product;
+      const naam = [
+        p.brands ? p.brands.split(',')[0].trim() : '',
+        (p.product_name_nl || p.product_name || '').trim(),
+        (p.quantity || '').trim()
+      ].filter(Boolean).join(' ');
+      document.getElementById('inputNaam').value = naam || 'Onbekend product';
+      document.getElementById('inputCategorie').value = 'voedsel';
+      showToast(naam ? 'Gevonden: ' + naam : 'Product gevonden');
+      document.getElementById('inputDatum').focus();
+    } else {
+      document.getElementById('inputNaam').focus();
+      showToast('Product niet gevonden — vul de naam zelf in');
+    }
+  } catch (e) {
+    document.getElementById('inputNaam').focus();
+    showToast('Geen internet — vul de naam zelf in');
+  }
+}
+
+function setHeaderDate() {
+  const now = new Date();
+  const opts = { weekday: 'long', day: 'numeric', month: 'long' };
+  document.getElementById('headerDate').textContent = now.toLocaleDateString('nl-NL', opts);
+}
+
+// Init
+// Elke lokale wijziging plant automatisch een sync in (als die aanstaat)
+['saveProducten', 'saveNoodpakket', 'updateHuishouden', 'saveEigenNummer', 'saveNoodplanVeld', 'markCheckDone'].forEach(naam => {
+  const orig = window[naam];
+  if (typeof orig === 'function') {
+    window[naam] = function (...args) { const r = orig.apply(this, args); scheduleSync(); return r; };
+  }
+});
+
+setHeaderDate();
+renderNoodplan();
+renderNoodpakket();
+initSync();
+renderEhbo();
+renderProducten();
+updateStats();
+renderTodayAlerts();
+
+// Service worker voor offline gebruik (alleen via https of localhost)
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
